@@ -906,7 +906,8 @@ def get_api_key_for_model(model_name: str, config: RunnableConfig):
         return None
     else:
         if model_name.startswith("openai:"): 
-            return os.getenv("OPENAI_API_KEY")
+            # Use Heroku Inference API key if available, otherwise use OpenAI API key
+            return os.getenv("INFERENCE_KEY") or os.getenv("OPENAI_API_KEY")
         elif model_name.startswith("anthropic:"):
             return os.getenv("ANTHROPIC_API_KEY")
         elif model_name.startswith("google"):

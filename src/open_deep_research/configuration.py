@@ -244,6 +244,17 @@ class Configuration(BaseModel):
             field_name: os.environ.get(field_name.upper(), configurable.get(field_name))
             for field_name in field_names
         }
+        
+        # Use Heroku Inference API if available
+        if os.getenv("INFERENCE_KEY"):
+            heroku_model = "openai:claude-4-sonnet"
+            values.update({
+                "research_model": heroku_model,
+                "summarization_model": heroku_model,
+                "compression_model": heroku_model,
+                "final_report_model": heroku_model
+            })
+        
         return cls(**{k: v for k, v in values.items() if v is not None})
 
     class Config:
