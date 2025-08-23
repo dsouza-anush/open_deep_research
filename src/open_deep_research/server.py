@@ -83,8 +83,11 @@ async def conduct_research(request: ResearchRequest):
             )
         
         # Initialize the chat model directly
+        # For Heroku Inference API, use the model ID from environment
+        model_name = "openai:gpt-4o" if not os.getenv("INFERENCE_KEY") else f"openai:{os.getenv('INFERENCE_MODEL_ID', 'claude-4-sonnet')}"
+        
         model = init_chat_model(
-            model="openai:claude-4-sonnet",
+            model=model_name,
             api_key=api_key,
             base_url=base_url,
             max_tokens=4000
