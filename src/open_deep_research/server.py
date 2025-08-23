@@ -69,31 +69,54 @@ async def conduct_research(request: ResearchRequest):
                 "final_report_model": "openai:claude-4-sonnet"
             })
         
-        configuration = Configuration(**config_dict)
+        # For now, let's test with a simple OpenAI call
+        from langchain.chat_models import init_chat_model
         
-        # Run the research agent
-        result = await deep_researcher.ainvoke(
-            {"messages": [{"role": "user", "content": request.query}]},
-            config={"configurable": configuration.model_dump()}
+        # Get API key and base URL for Heroku Inference
+        api_key = os.getenv("INFERENCE_KEY") or os.getenv("OPENAI_API_KEY")
+        base_url = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
+        
+        if not api_key:
+            return ResearchResponse(
+                success=False,
+                error="No API key configured. Please set INFERENCE_KEY or OPENAI_API_KEY."
+            )
+        
+        # Initialize the chat model directly
+        model = init_chat_model(
+            model="openai:claude-4-sonnet",
+            api_key=api_key,
+            base_url=base_url,
+            max_tokens=4000
         )
         
-        # Extract the final report from the result
-        report = None
-        if result and "messages" in result:
-            for message in reversed(result["messages"]):
-                if hasattr(message, "content") and message.content:
-                    report = message.content
-                    break
+        # Simple research prompt
+        prompt = f"""You are a research assistant. Provide a comprehensive analysis of the following topic:
+
+{request.query}
+
+Please provide:
+1. Overview of the topic
+2. Key points and findings
+3. Current status or recent developments
+4. Relevant implications
+
+Keep the response informative and well-structured."""
+
+        # Get response from the model
+        response = await model.ainvoke([{"role": "user", "content": prompt}])
         
         return ResearchResponse(
             success=True,
-            report=report or "Research completed but no report generated"
+            report=response.content
         )
         
     except Exception as e:
+        import traceback
+        error_details = f"{str(e)}\n\nTraceback:\n{traceback.format_exc()}"
         return ResearchResponse(
             success=False,
-            error=str(e)
+            error=error_details
         )
 
 @app.get("/config")
