@@ -67,7 +67,8 @@ async def conduct_research(request: ResearchRequest):
                 "summarization_model": "openai:claude-4-sonnet", 
                 "compression_model": "openai:claude-4-sonnet",
                 "final_report_model": "openai:claude-4-sonnet",
-                "search_api": "brightdata"  # Use Bright Data for web search
+                "search_api": "brightdata",  # Use Bright Data for web search
+                "allow_clarification": False  # Disable clarification to avoid empty message issues
             })
         
         # For now, let's test with a simple OpenAI call
