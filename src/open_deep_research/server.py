@@ -82,58 +82,28 @@ async def conduct_research(request: ResearchRequest):
                 error="No API key configured. Please set INFERENCE_KEY or OPENAI_API_KEY."
             )
         
-        # Simple research prompt
-        prompt = f"""You are a research assistant. Provide a comprehensive analysis of the following topic:
-
-{request.query}
-
-Please provide:
-1. Overview of the topic
-2. Key points and findings
-3. Current status or recent developments
-4. Relevant implications
-
-Keep the response informative and well-structured."""
-
-        # Initialize the chat model directly
-        if os.getenv("INFERENCE_KEY"):
-            # For Heroku Inference API, use the model ID without prefix
-            model_name = os.getenv('INFERENCE_MODEL_ID', 'claude-4-sonnet')
-            
-            # Use OpenAI client directly for Heroku Inference API
-            from openai import AsyncOpenAI
-            client = AsyncOpenAI(
-                api_key=api_key,
-                base_url=base_url
-            )
-            
-            # Make direct API call to Heroku Inference
-            response_data = await client.chat.completions.create(
-                model=model_name,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=4000
-            )
-            
-            return ResearchResponse(
-                success=True,
-                report=response_data.choices[0].message.content
-            )
-        else:
-            # Use standard OpenAI API
-            model = init_chat_model(
-                model="openai:gpt-4o",
-                api_key=api_key,
-                base_url=base_url,
-                max_tokens=4000
-            )
-            
-            # Get response from the model
-            response = await model.ainvoke([{"role": "user", "content": prompt}])
-            
-            return ResearchResponse(
-                success=True,
-                report=response.content
-            )
+        # Use the full LangGraph deep research workflow
+        configuration = Configuration(**config_dict)
+        
+        # Run the actual deep research agent
+        result = await deep_researcher.ainvoke(
+            {"messages": [{"role": "user", "content": request.query}]},
+            config={"configurable": configuration.model_dump()}
+        )
+        
+        # Extract the final research report
+        report = None
+        if result and "messages" in result:
+            # Get the last message which should be the final report
+            for message in reversed(result["messages"]):
+                if hasattr(message, "content") and message.content:
+                    report = message.content
+                    break
+        
+        return ResearchResponse(
+            success=True,
+            report=report or "Research completed but no report was generated."
+        )
         
     except Exception as e:
         import traceback
