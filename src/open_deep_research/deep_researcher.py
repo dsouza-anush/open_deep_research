@@ -330,18 +330,19 @@ async def supervisor(state: SupervisorState, config: RunnableConfig) -> Command[
     # Filter out empty messages but preserve AI messages with tool calls
     filtered_messages = []
     for i, msg in enumerate(supervisor_messages):
-        # Keep messages with content
-        if hasattr(msg, 'content') and msg.content and msg.content.strip():
+        # Check if message has tool calls first (highest priority)
+        if hasattr(msg, 'tool_calls') and msg.tool_calls:
+            print(f"Debug: Keeping AI message with tool calls at index {i} (content: '{msg.content if hasattr(msg, 'content') else 'N/A'}')")
             filtered_messages.append(msg)
-        # Keep AI messages with tool calls even if content is empty
-        elif hasattr(msg, 'tool_calls') and msg.tool_calls:
-            print(f"Debug: Keeping AI message with tool calls at index {i} despite empty content")
-            filtered_messages.append(msg)
-        # Keep tool messages (they need content but we handle them separately)
+        # Check if message has tool_call_id (tool result messages)
         elif hasattr(msg, 'tool_call_id'):
+            print(f"Debug: Keeping tool result message at index {i}")
+            filtered_messages.append(msg)
+        # Keep messages with non-empty content
+        elif hasattr(msg, 'content') and msg.content is not None and msg.content.strip():
             filtered_messages.append(msg)
         else:
-            print(f"Debug: Filtering out empty message at index {i}: {msg}")
+            print(f"Debug: Filtering out empty message at index {i}: content='{msg.content if hasattr(msg, 'content') else 'N/A'}', has_tool_calls={hasattr(msg, 'tool_calls')}")
     
     # Ensure we have at least one message
     if not filtered_messages:
