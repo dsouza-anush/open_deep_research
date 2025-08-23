@@ -66,12 +66,21 @@ def ensure_message_content_validity(messages):
         List of validated messages with proper content
     """
     validated_messages = []
-    for message in messages:
-        if hasattr(message, 'content') and hasattr(message, 'tool_calls'):
-            # AI message with tool calls but empty content - add default content
-            if not message.content and getattr(message, 'tool_calls', None):
-                message.content = "Processing request and utilizing available tools."
-        validated_messages.append(message)
+    for i, message in enumerate(messages):
+        # Create a copy to avoid modifying the original
+        validated_message = message
+        
+        # Check if message has empty content (especially for AI messages)
+        if hasattr(message, 'content') and not message.content:
+            # If it's an AI message with tool calls, add default content
+            if hasattr(message, 'tool_calls') and getattr(message, 'tool_calls', None):
+                # Modify the content directly for API compatibility
+                validated_message.content = "Executing tools and processing request."
+            elif hasattr(message, 'type') and getattr(message, 'type', '') == 'ai':
+                # Any AI message with empty content gets default content
+                validated_message.content = "Processing your request."
+                
+        validated_messages.append(validated_message)
     return validated_messages
 
 # Initialize a configurable model that we will use throughout the agent
@@ -357,6 +366,13 @@ async def supervisor(state: SupervisorState, config: RunnableConfig) -> Command[
     # Validate messages before sending to API to prevent content validation errors
     validated_messages = ensure_message_content_validity(supervisor_messages)
     print(f"Debug: Sending {len(validated_messages)} validated messages to supervisor")
+    
+    # Debug log message contents for troubleshooting
+    for i, msg in enumerate(validated_messages):
+        content_preview = (msg.content[:50] + "...") if msg.content and len(msg.content) > 50 else msg.content
+        has_tool_calls = hasattr(msg, 'tool_calls') and msg.tool_calls
+        print(f"Debug: Message {i}: type={type(msg).__name__}, content='{content_preview}', has_tools={has_tool_calls}")
+    
     response = await research_model.ainvoke(validated_messages)
     
     # Step 3: Ensure response has valid content for API compatibility
