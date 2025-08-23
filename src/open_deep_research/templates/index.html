@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Open Deep Research</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background-color: #0d1117;
+            color: #f0f6fc;
+            height: 100vh;
+            display: flex;
+        }
+
+        .sidebar {
+            width: 260px;
+            background-color: #010409;
+            border-right: 1px solid #21262d;
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+        }
+
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #21262d;
+        }
+
+        .sidebar-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #f0f6fc;
+        }
+
+        .new-chat-btn {
+            background: none;
+            border: 1px solid #30363d;
+            color: #7d8590;
+            padding: 6px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .new-chat-btn:hover {
+            background-color: #21262d;
+            border-color: #8b949e;
+        }
+
+        .chat-history {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .chat-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #8b949e;
+            border: 1px solid transparent;
+        }
+
+        .chat-item:hover {
+            background-color: #161b22;
+            border-color: #30363d;
+        }
+
+        .chat-item.active {
+            background-color: #21262d;
+            border-color: #f78166;
+            color: #f0f6fc;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .chat-container {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .welcome-message {
+            text-align: center;
+            max-width: 600px;
+            margin-top: 40px;
+        }
+
+        .welcome-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #f0f6fc;
+        }
+
+        .welcome-subtitle {
+            font-size: 16px;
+            color: #8b949e;
+            margin-bottom: 32px;
+        }
+
+        .chat-messages {
+            width: 100%;
+            max-width: 800px;
+            margin-bottom: 100px;
+        }
+
+        .message {
+            margin-bottom: 24px;
+            display: flex;
+            gap: 12px;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message.assistant {
+            justify-content: flex-start;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 16px 20px;
+            border-radius: 18px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .message.user .message-content {
+            background-color: #1f6feb;
+            color: #f0f6fc;
+            border-bottom-right-radius: 6px;
+        }
+
+        .message.assistant .message-content {
+            background-color: #21262d;
+            color: #f0f6fc;
+            border: 1px solid #30363d;
+            border-bottom-left-radius: 6px;
+        }
+
+        .loading-indicator {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            color: #8b949e;
+            font-size: 14px;
+            margin: 20px 0;
+        }
+
+        .loading-spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #30363d;
+            border-top: 2px solid #8b949e;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .input-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: #0d1117;
+            border-top: 1px solid #21262d;
+            padding: 24px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .input-wrapper {
+            width: 100%;
+            max-width: 800px;
+            position: relative;
+        }
+
+        .message-input {
+            width: 100%;
+            background-color: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 24px;
+            padding: 16px 60px 16px 20px;
+            font-size: 14px;
+            color: #f0f6fc;
+            resize: none;
+            outline: none;
+            min-height: 52px;
+            max-height: 150px;
+            font-family: inherit;
+        }
+
+        .message-input:focus {
+            border-color: #1f6feb;
+            box-shadow: 0 0 0 2px rgba(31, 111, 235, 0.2);
+        }
+
+        .message-input::placeholder {
+            color: #7d8590;
+        }
+
+        .send-button {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: #1f6feb;
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        .send-button:hover {
+            background-color: #1158c7;
+        }
+
+        .send-button:disabled {
+            background-color: #30363d;
+            cursor: not-allowed;
+        }
+
+        .research-report {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 16px 0;
+            white-space: pre-wrap;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            overflow-x: auto;
+        }
+
+        .error-message {
+            background-color: #3c1e1e;
+            border: 1px solid #f85149;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+            color: #f85149;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">Deep Research</div>
+            <button class="new-chat-btn" onclick="newChat()">+</button>
+        </div>
+        <div class="chat-history">
+            <div class="chat-item active">New Research Session</div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="chat-container">
+            <div class="welcome-message" id="welcome">
+                <h1 class="welcome-title">Open Deep Research</h1>
+                <p class="welcome-subtitle">Ask me to research any topic and I'll provide comprehensive analysis</p>
+            </div>
+            
+            <div class="chat-messages" id="messages"></div>
+            
+            <div class="loading-indicator" id="loading">
+                <div class="loading-spinner"></div>
+                <span>Researching...</span>
+            </div>
+        </div>
+
+        <div class="input-container">
+            <div class="input-wrapper">
+                <textarea 
+                    id="messageInput" 
+                    class="message-input" 
+                    placeholder="Send a message...type @ to include tickers"
+                    rows="1"
+                ></textarea>
+                <button class="send-button" id="sendButton" onclick="sendMessage()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const messagesContainer = document.getElementById('messages');
+        const loadingIndicator = document.getElementById('loading');
+        const welcomeMessage = document.getElementById('welcome');
+
+        let isResearching = false;
+
+        messageInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        messageInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 150) + 'px';
+        });
+
+        function newChat() {
+            messagesContainer.innerHTML = '';
+            welcomeMessage.style.display = 'block';
+            messageInput.value = '';
+        }
+
+        async function sendMessage() {
+            const query = messageInput.value.trim();
+            if (!query || isResearching) return;
+
+            // Hide welcome message
+            welcomeMessage.style.display = 'none';
+
+            // Add user message
+            addMessage(query, 'user');
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+
+            // Show loading
+            setResearching(true);
+
+            try {
+                const response = await fetch('/research', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: query })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    addMessage(data.report, 'assistant', true);
+                } else {
+                    addErrorMessage(data.error || 'Research failed');
+                }
+            } catch (error) {
+                addErrorMessage('Network error: ' + error.message);
+            }
+
+            setResearching(false);
+        }
+
+        function addMessage(content, type, isReport = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            
+            if (isReport) {
+                contentDiv.className += ' research-report';
+            }
+            
+            contentDiv.textContent = content;
+            messageDiv.appendChild(contentDiv);
+            messagesContainer.appendChild(messageDiv);
+            
+            // Scroll to bottom
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function addErrorMessage(error) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = 'Error: ' + error;
+            messagesContainer.appendChild(errorDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function setResearching(researching) {
+            isResearching = researching;
+            sendButton.disabled = researching;
+            loadingIndicator.style.display = researching ? 'flex' : 'none';
+        }
+    </script>
+</body>
+</html>

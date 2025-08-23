@@ -1,10 +1,13 @@
 """FastAPI server for deploying Deep Research agent to Heroku."""
 
 import os
+from pathlib import Path
 from typing import Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from open_deep_research.deep_researcher import deep_researcher
@@ -15,6 +18,10 @@ app = FastAPI(
     description="Deep research agent with automated report generation",
     version="0.0.16"
 )
+
+# Setup templates
+templates_dir = Path(__file__).parent / "templates"
+templates = Jinja2Templates(directory=str(templates_dir))
 
 # Add CORS middleware
 app.add_middleware(
@@ -36,10 +43,10 @@ class ResearchResponse(BaseModel):
     report: Optional[str] = None
     error: Optional[str] = None
 
-@app.get("/")
-async def root():
-    """Health check endpoint."""
-    return {"message": "Open Deep Research API is running"}
+@app.get("/", response_class=HTMLResponse)
+async def root(request: Request):
+    """Serve the web interface."""
+    return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/health")
 async def health():
