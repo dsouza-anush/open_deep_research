@@ -82,17 +82,6 @@ async def conduct_research(request: ResearchRequest):
                 error="No API key configured. Please set INFERENCE_KEY or OPENAI_API_KEY."
             )
         
-        # Initialize the chat model directly
-        # For Heroku Inference API, use the model ID from environment
-        model_name = "openai:gpt-4o" if not os.getenv("INFERENCE_KEY") else f"openai:{os.getenv('INFERENCE_MODEL_ID', 'claude-4-sonnet')}"
-        
-        model = init_chat_model(
-            model=model_name,
-            api_key=api_key,
-            base_url=base_url,
-            max_tokens=4000
-        )
-        
         # Simple research prompt
         prompt = f"""You are a research assistant. Provide a comprehensive analysis of the following topic:
 
@@ -106,13 +95,45 @@ Please provide:
 
 Keep the response informative and well-structured."""
 
-        # Get response from the model
-        response = await model.ainvoke([{"role": "user", "content": prompt}])
-        
-        return ResearchResponse(
-            success=True,
-            report=response.content
-        )
+        # Initialize the chat model directly
+        if os.getenv("INFERENCE_KEY"):
+            # For Heroku Inference API, use the model ID without prefix
+            model_name = os.getenv('INFERENCE_MODEL_ID', 'claude-4-sonnet')
+            
+            # Use OpenAI client directly for Heroku Inference API
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(
+                api_key=api_key,
+                base_url=base_url
+            )
+            
+            # Make direct API call to Heroku Inference
+            response_data = await client.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=4000
+            )
+            
+            return ResearchResponse(
+                success=True,
+                report=response_data.choices[0].message.content
+            )
+        else:
+            # Use standard OpenAI API
+            model = init_chat_model(
+                model="openai:gpt-4o",
+                api_key=api_key,
+                base_url=base_url,
+                max_tokens=4000
+            )
+            
+            # Get response from the model
+            response = await model.ainvoke([{"role": "user", "content": prompt}])
+            
+            return ResearchResponse(
+                success=True,
+                report=response.content
+            )
         
     except Exception as e:
         import traceback
