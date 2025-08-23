@@ -1,0 +1,71 @@
+{
+  "name": "Open Deep Research",
+  "description": "A configurable, fully open-source deep research agent powered by Claude 4 Sonnet via Heroku Inference API. Features modern dark UI, comprehensive research capabilities, and easy one-click deployment.",
+  "repository": "https://github.com/dsouza-anush/open_deep_research",
+  "logo": "https://raw.githubusercontent.com/langchain-ai/open_deep_research/main/docs/static/img/logo.png",
+  "keywords": [
+    "ai",
+    "research",
+    "claude",
+    "langchain",
+    "langgraph",
+    "anthropic",
+    "chatbot",
+    "python",
+    "fastapi"
+  ],
+  "stack": "heroku-24",
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "env": {
+    "PYTHONPATH": {
+      "description": "Python path for module imports",
+      "value": "/app/src"
+    },
+    "TAVILY_API_KEY": {
+      "description": "Tavily API key for web search capabilities (optional but recommended for enhanced research)",
+      "value": "tvly-placeholder",
+      "required": false
+    },
+    "LANGSMITH_API_KEY": {
+      "description": "LangSmith API key for tracing and monitoring (optional)",
+      "required": false
+    },
+    "LANGSMITH_PROJECT": {
+      "description": "LangSmith project name",
+      "value": "heroku-deep-research",
+      "required": false
+    },
+    "LANGSMITH_TRACING": {
+      "description": "Enable LangSmith tracing",
+      "value": "false"
+    }
+  },
+  "addons": [
+    {
+      "plan": "heroku-inference:claude-4-sonnet",
+      "as": "INFERENCE"
+    }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "image": "heroku/python",
+  "success_url": "/",
+  "scripts": {
+    "postdeploy": "echo 'Open Deep Research deployed successfully! Visit your app to start researching.'"
+  },
+  "environments": {
+    "test": {
+      "addons": [
+        "heroku-inference:claude-4-sonnet"
+      ]
+    }
+  }
+}

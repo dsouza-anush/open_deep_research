@@ -4,6 +4,22 @@
 
 Deep research has broken out as one of the most popular agent applications. This is a simple, configurable, fully open source deep research agent that works across many model providers, search tools, and MCP servers. It's performance is on par with many popular deep research agents ([see Deep Research Bench leaderboard](https://huggingface.co/spaces/Ayanami0730/DeepResearch-Leaderboard)).
 
+## ⚡ One-Click Heroku Deployment
+
+Deploy this research agent to Heroku with Claude 4 Sonnet in seconds:
+
+[![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/dsouza-anush/open_deep_research)
+
+**Features:**
+- 🤖 **Claude 4 Sonnet** via Heroku Inference API (automatically configured)
+- 🎨 **Modern Dark UI** with beautiful research report formatting
+- 🔍 **Comprehensive Research** with structured analysis
+- 📱 **Responsive Design** works on desktop and mobile
+- 🚀 **Zero Configuration** - works out of the box
+- 💰 **Cost Effective** - pay-per-use Heroku Inference pricing
+
+After deployment, your research agent will be ready to use immediately with no additional setup required!
+
 <img width="817" height="666" alt="Screenshot 2025-07-13 at 11 21 12 PM" src="https://github.com/user-attachments/assets/052f2ed3-c664-4a4f-8ec2-074349dcaa3f" />
 
 ### 🔥 Recent Updates
@@ -48,6 +64,48 @@ uvx --refresh --from "langgraph-cli[inmem]" --with-editable . --python 3.11 lang
 ```
 
 This will open the LangGraph Studio UI in your browser.
+
+## 🌐 Heroku Deployment Reference
+
+This repository serves as a **complete reference implementation** for deploying LangGraph applications to Heroku with modern web interfaces. 
+
+### Architecture
+
+- **Backend**: Python + FastAPI + LangGraph
+- **Frontend**: Server-side rendered HTML with modern JavaScript
+- **AI Model**: Claude 4 Sonnet via Heroku Inference API
+- **Database**: None required (stateless design)
+- **Deployment**: Single-app architecture with Python templating
+
+### Key Files for Heroku Deployment
+
+- **`app.json`** - Heroku Button configuration with addons and environment variables
+- **`Procfile`** - Web server process definition (`uvicorn src.open_deep_research.server:app`)
+- **`runtime.txt`** - Python version specification
+- **`requirements.txt`** - Python dependencies (generated from pyproject.toml)
+- **`src/open_deep_research/server.py`** - FastAPI application with web UI
+- **`src/open_deep_research/templates/`** - HTML templates with dark modern UI
+
+### Heroku-Specific Adaptations
+
+1. **Environment Variable Configuration**: Automatic detection of Heroku Inference API
+2. **Port Binding**: Uses `$PORT` environment variable from Heroku
+3. **Static File Serving**: Templates served via FastAPI/Jinja2
+4. **Single Process**: Everything runs in one web dyno for cost efficiency
+5. **Auto-scaling Ready**: Stateless design supports horizontal scaling
+
+### Cost Structure
+
+- **Basic Dyno**: ~$7/month for 24/7 availability
+- **Heroku Inference API**: Pay-per-use pricing for Claude 4 Sonnet
+- **No Database Costs**: Stateless design eliminates database requirements
+
+This implementation demonstrates best practices for:
+- Python web app deployment on Heroku
+- AI model integration with Heroku Inference API  
+- Modern web UI development with server-side rendering
+- One-click deployment with Heroku Button
+- Production-ready error handling and logging
 
 ```
 - 🚀 API: http://127.0.0.1:2024
