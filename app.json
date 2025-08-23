@@ -25,6 +25,10 @@
       "description": "Python path for module imports",
       "value": "/app/src"
     },
+    "BRIGHTDATA_API_KEY": {
+      "description": "Bright Data API key for web search and scraping capabilities",
+      "required": false
+    },
     "TAVILY_API_KEY": {
       "description": "Tavily API key for web search capabilities (optional but recommended for enhanced research)",
       "value": "tvly-placeholder",

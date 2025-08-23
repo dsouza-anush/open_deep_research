@@ -66,7 +66,8 @@ async def conduct_research(request: ResearchRequest):
                 "research_model": "openai:claude-4-sonnet",
                 "summarization_model": "openai:claude-4-sonnet", 
                 "compression_model": "openai:claude-4-sonnet",
-                "final_report_model": "openai:claude-4-sonnet"
+                "final_report_model": "openai:claude-4-sonnet",
+                "search_api": "brightdata"  # Use Bright Data for web search
             })
         
         # For now, let's test with a simple OpenAI call

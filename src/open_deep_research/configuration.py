@@ -14,6 +14,7 @@ class SearchAPI(Enum):
     ANTHROPIC = "anthropic"
     OPENAI = "openai"
     TAVILY = "tavily"
+    BRIGHTDATA = "brightdata"
     NONE = "none"
 
 class MCPConfig(BaseModel):
@@ -76,13 +77,14 @@ class Configuration(BaseModel):
     )
     # Research Configuration
     search_api: SearchAPI = Field(
-        default=SearchAPI.TAVILY,
+        default=SearchAPI.BRIGHTDATA,
         metadata={
             "x_oap_ui_config": {
                 "type": "select",
-                "default": "tavily",
+                "default": "brightdata",
                 "description": "Search API to use for research. NOTE: Make sure your Researcher Model supports the selected search API.",
                 "options": [
+                    {"label": "Bright Data", "value": SearchAPI.BRIGHTDATA.value},
                     {"label": "Tavily", "value": SearchAPI.TAVILY.value},
                     {"label": "OpenAI Native Web Search", "value": SearchAPI.OPENAI.value},
                     {"label": "Anthropic Native Web Search", "value": SearchAPI.ANTHROPIC.value},
@@ -124,7 +126,7 @@ class Configuration(BaseModel):
             "x_oap_ui_config": {
                 "type": "text",
                 "default": "openai:gpt-4.1-mini",
-                "description": "Model for summarizing research results from Tavily search results"
+                "description": "Model for summarizing research results from web search and data collection"
             }
         }
     )

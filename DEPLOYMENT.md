@@ -95,9 +95,16 @@ git push heroku main
 - `OPENAI_API_BASE`: Set to Heroku Inference endpoint
 
 ### Optional
-- `TAVILY_API_KEY`: For enhanced web search
+- `BRIGHTDATA_API_KEY`: For web search and scraping (set this for optimal search functionality)
+- `TAVILY_API_KEY`: For fallback web search
 - `LANGSMITH_API_KEY`: For tracing and monitoring
 - `LANGSMITH_TRACING`: Set to `false` for production
+
+### Setting Environment Variables for Heroku
+After deployment, set your Bright Data API key:
+```bash
+heroku config:set BRIGHTDATA_API_KEY=your_api_key_here --app your-app-name
+```
 
 ## Cost Optimization
 

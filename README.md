@@ -17,13 +17,14 @@ Deploy this research agent to Heroku with Claude 4 Sonnet in seconds:
 
 **Features:**
 - 🤖 **Claude 4 Sonnet** via Heroku Inference API (automatically configured)
+- 🌐 **Bright Data Integration** for powerful web search and data collection
 - 🎨 **Modern Dark UI** with beautiful research report formatting
 - 🔍 **Comprehensive Research** with structured analysis
 - 📱 **Responsive Design** works on desktop and mobile
-- 🚀 **Zero Configuration** - works out of the box
-- 💰 **Cost Effective** - pay-per-use Heroku Inference pricing
+- 🚀 **Easy Configuration** - just add your Bright Data API key
+- 💰 **Cost Effective** - pay-per-use pricing for both AI and data collection
 
-After deployment, your research agent will be ready to use immediately with no additional setup required!
+After deployment, just add your Bright Data API key and your research agent will be ready to perform comprehensive web research!
 
 <img width="817" height="666" alt="Screenshot 2025-07-13 at 11 21 12 PM" src="https://github.com/user-attachments/assets/052f2ed3-c664-4a4f-8ec2-074349dcaa3f" />
 
@@ -59,6 +60,9 @@ uv pip install -r pyproject.toml
 3. Set up your `.env` file to customize the environment variables (for model selection, search tools, and other configuration settings):
 ```bash
 cp .env.example .env
+# Edit .env to add your API keys:
+# BRIGHTDATA_API_KEY=your_bright_data_api_key_here
+# OPENAI_API_KEY=your_openai_key_here (if not using Heroku Inference)
 ```
 
 4. Launch agent with the LangGraph server locally:
@@ -137,7 +141,7 @@ Open Deep Research supports a wide range of LLM providers via the [init_chat_mod
 
 #### Search API :mag:
 
-Open Deep Research supports a wide range of search tools. By default it uses the [Tavily](https://www.tavily.com/) search API. Has full MCP compatibility and work native web search for Anthropic and OpenAI. See the `search_api` and `mcp_config` fields in the [configuration.py](https://github.com/langchain-ai/open_deep_research/blob/main/src/open_deep_research/configuration.py) file for more details. This can be accessed via the LangGraph Studio UI. 
+Open Deep Research supports a wide range of search tools. By default it uses [Bright Data](https://brightdata.com/) for comprehensive web search and data collection through their proxy network. Also supports [Tavily](https://www.tavily.com/) as a fallback, with full MCP compatibility and native web search for Anthropic and OpenAI. See the `search_api` and `mcp_config` fields in the [configuration.py](https://github.com/langchain-ai/open_deep_research/blob/main/src/open_deep_research/configuration.py) file for more details. This can be accessed via the LangGraph Studio UI. 
 
 #### Other 
 

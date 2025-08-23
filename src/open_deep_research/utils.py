@@ -34,6 +34,232 @@ from open_deep_research.prompts import summarize_webpage_prompt
 from open_deep_research.state import ResearchComplete, Summary
 
 ##########################
+# Bright Data Search Tool Utils
+##########################
+
+try:
+    from langchain_brightdata import BrightDataWebScraperAPI
+    BRIGHTDATA_AVAILABLE = True
+except ImportError:
+    BRIGHTDATA_AVAILABLE = False
+    logging.warning("langchain_brightdata not installed. Bright Data search will be unavailable.")
+
+BRIGHT_DATA_SEARCH_DESCRIPTION = (
+    "A comprehensive web search and scraping engine powered by Bright Data's proxy network. "
+    "Useful for when you need to answer questions about current events and gather detailed information."
+)
+
+@tool(description=BRIGHT_DATA_SEARCH_DESCRIPTION)
+async def brightdata_search(
+    queries: List[str],
+    max_results: Annotated[int, InjectedToolArg] = 5,
+    topic: Annotated[Literal["general", "news", "finance"], InjectedToolArg] = "general",
+    config: RunnableConfig = None
+) -> str:
+    """Fetch and summarize search results from Bright Data search API.
+
+    Args:
+        queries: List of search queries to execute
+        max_results: Maximum number of results to return per query
+        topic: Topic filter for search results (general, news, or finance)
+        config: Runtime configuration for API keys and model settings
+
+    Returns:
+        Formatted string containing summarized search results
+    """
+    if not BRIGHTDATA_AVAILABLE:
+        return "Bright Data integration is not available. Please install langchain_brightdata package."
+    
+    # Get API key
+    api_key = get_brightdata_api_key(config)
+    if not api_key:
+        return "Bright Data API key not configured. Please set BRIGHTDATA_API_KEY environment variable."
+    
+    # Initialize Bright Data scraper
+    scraper = BrightDataWebScraperAPI(bright_data_api_key=api_key)
+    
+    # Step 1: Execute search queries and scrape results
+    search_results = await brightdata_search_async(
+        queries,
+        max_results=max_results,
+        topic=topic,
+        scraper=scraper
+    )
+    
+    # Step 2: Deduplicate results by URL to avoid processing the same content multiple times
+    unique_results = {}
+    for response in search_results:
+        for result in response['results']:
+            url = result['url']
+            if url not in unique_results:
+                unique_results[url] = {**result, "query": response['query']}
+    
+    # Step 3: Set up the summarization model with configuration
+    configurable = Configuration.from_runnable_config(config)
+    
+    # Character limit to stay within model token limits (configurable)
+    max_char_to_include = configurable.max_content_length
+    
+    # Initialize summarization model with retry logic
+    model_api_key = get_api_key_for_model(configurable.summarization_model, config)
+    summarization_model = init_chat_model(
+        model=configurable.summarization_model,
+        max_tokens=configurable.summarization_model_max_tokens,
+        api_key=model_api_key,
+        tags=["langsmith:nostream"]
+    ).with_structured_output(Summary).with_retry(
+        stop_after_attempt=configurable.max_structured_output_retries
+    )
+    
+    # Step 4: Create summarization tasks (skip empty content)
+    async def noop():
+        """No-op function for results without content."""
+        return None
+    
+    summarization_tasks = [
+        noop() if not result.get("content") 
+        else summarize_webpage(
+            summarization_model, 
+            result['content'][:max_char_to_include]
+        )
+        for result in unique_results.values()
+    ]
+    
+    # Step 5: Execute all summarization tasks in parallel
+    summaries = await asyncio.gather(*summarization_tasks)
+    
+    # Step 6: Combine results with their summaries
+    summarized_results = {
+        url: {
+            'title': result['title'], 
+            'content': result['content'] if summary is None else summary
+        }
+        for url, result, summary in zip(
+            unique_results.keys(), 
+            unique_results.values(), 
+            summaries
+        )
+    }
+    
+    # Step 7: Format the final output
+    if not summarized_results:
+        return "No valid search results found. Please try different search queries or use a different search API."
+    
+    formatted_output = "Search results: \n\n"
+    for i, (url, result) in enumerate(summarized_results.items()):
+        formatted_output += f"\n\n--- SOURCE {i+1}: {result['title']} ---\n"
+        formatted_output += f"URL: {url}\n\n"
+        formatted_output += f"SUMMARY:\n{result['content']}\n\n"
+        formatted_output += "\n\n" + "-" * 80 + "\n"
+    
+    return formatted_output
+
+
+async def brightdata_search_async(
+    search_queries, 
+    max_results: int = 5, 
+    topic: Literal["general", "news", "finance"] = "general", 
+    scraper=None
+):
+    """Execute multiple Bright Data search queries asynchronously using web scraping.
+    
+    Args:
+        search_queries: List of search query strings to execute
+        max_results: Maximum number of results per query
+        topic: Topic category for filtering results
+        scraper: BrightDataWebScraperAPI instance
+        
+    Returns:
+        List of search result dictionaries from Bright Data API
+    """
+    if not scraper:
+        return [{"query": query, "results": []} for query in search_queries]
+    
+    # Create search tasks for parallel execution
+    search_tasks = [
+        brightdata_single_search(
+            query,
+            max_results=max_results,
+            topic=topic,
+            scraper=scraper
+        )
+        for query in search_queries
+    ]
+    
+    # Execute all search queries in parallel and return results
+    search_results = await asyncio.gather(*search_tasks)
+    return search_results
+
+
+async def brightdata_single_search(
+    query: str,
+    max_results: int = 5,
+    topic: str = "general",
+    scraper=None
+):
+    """Execute a single Bright Data search query using web scraping.
+    
+    Args:
+        query: Search query string
+        max_results: Maximum number of results to return
+        topic: Topic category for filtering
+        scraper: BrightDataWebScraperAPI instance
+        
+    Returns:
+        Dictionary containing search results
+    """
+    if not scraper:
+        return {"query": query, "results": []}
+    
+    try:
+        # Use Google search with Bright Data scraping for current results
+        search_url = f"https://www.google.com/search?q={query.replace(' ', '+')}&num={max_results}"
+        
+        # Add topic-specific search modifiers
+        if topic == "news":
+            search_url += "&tbm=nws&tbs=qdr:w"  # News results from past week
+        elif topic == "finance":
+            search_url += " site:bloomberg.com OR site:reuters.com OR site:wsj.com OR site:finance.yahoo.com"
+        
+        # Scrape search results page
+        scrape_result = await scraper.ainvoke(search_url)
+        
+        # Parse the scraped content to extract search results
+        # This is a simplified parser - in production you'd want more robust parsing
+        results = []
+        if scrape_result:
+            # Extract search result data from the scraped HTML
+            # This is a basic implementation - you might want to use BeautifulSoup for better parsing
+            import re
+            
+            # Try to extract search result patterns
+            title_pattern = r'<h3[^>]*>([^<]+)</h3>'
+            url_pattern = r'<a[^>]*href="([^"]+)"[^>]*>'
+            snippet_pattern = r'<span[^>]*class="[^"]*st[^"]*"[^>]*>([^<]+)</span>'
+            
+            titles = re.findall(title_pattern, scrape_result, re.IGNORECASE)
+            urls = re.findall(url_pattern, scrape_result)
+            snippets = re.findall(snippet_pattern, scrape_result, re.IGNORECASE)
+            
+            # Combine results
+            for i in range(min(len(titles), len(urls), len(snippets), max_results)):
+                if urls[i].startswith('http'):
+                    results.append({
+                        "title": titles[i].strip(),
+                        "url": urls[i],
+                        "content": snippets[i].strip(),
+                        "published_date": "",
+                        "score": 1.0 - (i * 0.1)  # Decreasing relevance score
+                    })
+        
+        return {"query": query, "results": results}
+        
+    except Exception as e:
+        logging.error(f"Error in Bright Data search: {str(e)}")
+        return {"query": query, "results": []}
+
+
+##########################
 # Tavily Search Tool Utils
 ##########################
 TAVILY_SEARCH_DESCRIPTION = (
@@ -549,6 +775,16 @@ async def get_search_tool(search_api: SearchAPI):
         # OpenAI's web search preview functionality
         return [{"type": "web_search_preview"}]
         
+    elif search_api == SearchAPI.BRIGHTDATA:
+        # Configure Bright Data search tool with metadata
+        search_tool = brightdata_search
+        search_tool.metadata = {
+            **(search_tool.metadata or {}), 
+            "type": "search", 
+            "name": "web_search"
+        }
+        return [search_tool]
+        
     elif search_api == SearchAPI.TAVILY:
         # Configure Tavily search tool with metadata
         search_tool = tavily_search
@@ -913,6 +1149,17 @@ def get_api_key_for_model(model_name: str, config: RunnableConfig):
         elif model_name.startswith("google"):
             return os.getenv("GOOGLE_API_KEY")
         return None
+
+def get_brightdata_api_key(config: RunnableConfig):
+    """Get Bright Data API key from environment or config."""
+    should_get_from_config = os.getenv("GET_API_KEYS_FROM_CONFIG", "false")
+    if should_get_from_config.lower() == "true":
+        api_keys = config.get("configurable", {}).get("apiKeys", {})
+        if not api_keys:
+            return None
+        return api_keys.get("BRIGHTDATA_API_KEY")
+    else:
+        return os.getenv("BRIGHTDATA_API_KEY")
 
 def get_tavily_api_key(config: RunnableConfig):
     """Get Tavily API key from environment or config."""
