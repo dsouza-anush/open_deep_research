@@ -221,8 +221,11 @@ async def brightdata_single_search(
         elif topic == "finance":
             search_url += " site:bloomberg.com OR site:reuters.com OR site:wsj.com OR site:finance.yahoo.com"
         
-        # Scrape search results page
-        scrape_result = await scraper.ainvoke(search_url)
+        # Scrape search results page with proper dataset type
+        scrape_result = await scraper.ainvoke({
+            "url": search_url,
+            "dataset_type": "web_scraper"
+        })
         
         # Parse the scraped content to extract search results
         # This is a simplified parser - in production you'd want more robust parsing

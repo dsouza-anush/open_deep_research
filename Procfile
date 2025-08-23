@@ -1,1 +1,1 @@
-web: uvicorn src.open_deep_research.server:app --host 0.0.0.0 --port $PORT
+web: uvicorn src.open_deep_research.server:app --host 0.0.0.0 --port $PORT --timeout-keep-alive 120
