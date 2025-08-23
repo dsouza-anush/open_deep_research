@@ -479,6 +479,13 @@ async def supervisor_tools(state: SupervisorState, config: RunnableConfig) -> Co
         else:
             print(f"Debug: Filtering out empty tool message: {msg}")
     
+    # Ensure we have the right number of tool results for tool calls
+    if filtered_tool_messages:
+        # Debug: Check tool call/result pairing
+        print(f"Debug: Adding {len(filtered_tool_messages)} tool messages")
+        if hasattr(most_recent_message, 'tool_calls'):
+            print(f"Debug: Previous message had {len(most_recent_message.tool_calls)} tool calls")
+    
     update_payload["supervisor_messages"] = filtered_tool_messages
     return Command(
         goto="supervisor",
