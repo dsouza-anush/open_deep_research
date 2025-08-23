@@ -57,6 +57,33 @@ configurable_model = init_chat_model(
     configurable_fields=("model", "max_tokens", "api_key"),
 )
 
+def is_heroku_inference_api(model_name: str) -> bool:
+    """Check if we're using Heroku Inference API which doesn't support response_format."""
+    return model_name and "openai:" in model_name
+
+async def parse_clarification_response(response_content: str) -> dict:
+    """Parse clarification response from plain text when structured output isn't available."""
+    import re
+    
+    # Look for clarification indicators
+    need_clarification = any(phrase in response_content.lower() for phrase in [
+        "need clarification", "unclear", "ambiguous", "could you clarify", 
+        "more specific", "what exactly", "which aspect", "need more information"
+    ])
+    
+    # Extract question if present (look for question marks)
+    questions = re.findall(r'[.!?]*\s*([^.!?]*\?)', response_content)
+    question = questions[0].strip() if questions else "Could you provide more details about what you'd like me to research?"
+    
+    # Create verification message
+    verification = "I understand your request and will proceed with the research."
+    
+    return {
+        "need_clarification": need_clarification,
+        "question": question,
+        "verification": verification
+    }
+
 async def clarify_with_user(state: AgentState, config: RunnableConfig) -> Command[Literal["write_research_brief", "__end__"]]:
     """Analyze user messages and ask clarifying questions if the research scope is unclear.
     
@@ -76,7 +103,7 @@ async def clarify_with_user(state: AgentState, config: RunnableConfig) -> Comman
         # Skip clarification step and proceed directly to research
         return Command(goto="write_research_brief")
     
-    # Step 2: Prepare the model for structured clarification analysis
+    # Step 2: Prepare the model for clarification analysis
     messages = state["messages"]
     model_config = {
         "model": configurable.research_model,
@@ -85,35 +112,78 @@ async def clarify_with_user(state: AgentState, config: RunnableConfig) -> Comman
         "tags": ["langsmith:nostream"]
     }
     
-    # Configure model with structured output and retry logic
-    clarification_model = (
-        configurable_model
-        .with_structured_output(ClarifyWithUser)
-        .with_retry(stop_after_attempt=configurable.max_structured_output_retries)
-        .with_config(model_config)
-    )
+    # Step 3: Check if we need to use structured output workaround
+    use_structured_output = not is_heroku_inference_api(configurable.research_model)
     
-    # Step 3: Analyze whether clarification is needed
-    prompt_content = clarify_with_user_instructions.format(
-        messages=get_buffer_string(messages), 
-        date=get_today_str()
-    )
-    response = await clarification_model.ainvoke([HumanMessage(content=prompt_content)])
-    
-    # Step 4: Route based on clarification analysis
-    if response.need_clarification:
-        # End with clarifying question for user
-        return Command(
-            goto=END, 
-            update={"messages": [AIMessage(content=response.question)]}
+    if use_structured_output:
+        # Configure model with structured output and retry logic
+        clarification_model = (
+            configurable_model
+            .with_structured_output(ClarifyWithUser)
+            .with_retry(stop_after_attempt=configurable.max_structured_output_retries)
+            .with_config(model_config)
         )
+        
+        # Analyze whether clarification is needed
+        prompt_content = clarify_with_user_instructions.format(
+            messages=get_buffer_string(messages), 
+            date=get_today_str()
+        )
+        response = await clarification_model.ainvoke([HumanMessage(content=prompt_content)])
+        
+        # Route based on clarification analysis
+        if response.need_clarification:
+            return Command(
+                goto=END, 
+                update={"messages": [AIMessage(content=response.question)]}
+            )
+        else:
+            return Command(
+                goto="write_research_brief", 
+                update={"messages": [AIMessage(content=response.verification)]}
+            )
     else:
-        # Proceed to research with verification message
-        return Command(
-            goto="write_research_brief", 
-            update={"messages": [AIMessage(content=response.verification)]}
-        )
+        # Use plain text response for Heroku Inference API
+        clarification_model = configurable_model.with_config(model_config)
+        
+        # Enhanced prompt for plain text parsing
+        prompt_content = clarify_with_user_instructions.format(
+            messages=get_buffer_string(messages), 
+            date=get_today_str()
+        ) + "\n\nPlease respond with either:\n1. A clarifying question if the request is unclear or ambiguous\n2. A confirmation that you understand and will proceed with research"
+        
+        response = await clarification_model.ainvoke([HumanMessage(content=prompt_content)])
+        parsed_response = await parse_clarification_response(response.content)
+        
+        # Route based on parsed clarification analysis
+        if parsed_response["need_clarification"]:
+            return Command(
+                goto=END, 
+                update={"messages": [AIMessage(content=parsed_response["question"])]}
+            )
+        else:
+            return Command(
+                goto="write_research_brief", 
+                update={"messages": [AIMessage(content=parsed_response["verification"])]}
+            )
 
+
+async def parse_research_brief_response(response_content: str) -> dict:
+    """Parse research brief from plain text when structured output isn't available."""
+    # Extract the research brief from the response
+    # Look for the main research topic/question in the response
+    lines = response_content.strip().split('\n')
+    
+    # Use the full response as research brief, or extract the main point
+    research_brief = response_content.strip()
+    
+    # Clean up the research brief if it contains meta-commentary
+    if "research brief:" in research_brief.lower():
+        parts = research_brief.lower().split("research brief:")
+        if len(parts) > 1:
+            research_brief = parts[1].strip()
+    
+    return {"research_brief": research_brief}
 
 async def write_research_brief(state: AgentState, config: RunnableConfig) -> Command[Literal["research_supervisor"]]:
     """Transform user messages into a structured research brief and initialize supervisor.
@@ -129,7 +199,7 @@ async def write_research_brief(state: AgentState, config: RunnableConfig) -> Com
     Returns:
         Command to proceed to research supervisor with initialized context
     """
-    # Step 1: Set up the research model for structured output
+    # Step 1: Set up the research model
     configurable = Configuration.from_runnable_config(config)
     research_model_config = {
         "model": configurable.research_model,
@@ -138,20 +208,38 @@ async def write_research_brief(state: AgentState, config: RunnableConfig) -> Com
         "tags": ["langsmith:nostream"]
     }
     
-    # Configure model for structured research question generation
-    research_model = (
-        configurable_model
-        .with_structured_output(ResearchQuestion)
-        .with_retry(stop_after_attempt=configurable.max_structured_output_retries)
-        .with_config(research_model_config)
-    )
+    # Step 2: Check if we need to use structured output workaround
+    use_structured_output = not is_heroku_inference_api(configurable.research_model)
     
-    # Step 2: Generate structured research brief from user messages
-    prompt_content = transform_messages_into_research_topic_prompt.format(
-        messages=get_buffer_string(state.get("messages", [])),
-        date=get_today_str()
-    )
-    response = await research_model.ainvoke([HumanMessage(content=prompt_content)])
+    if use_structured_output:
+        # Configure model for structured research question generation
+        research_model = (
+            configurable_model
+            .with_structured_output(ResearchQuestion)
+            .with_retry(stop_after_attempt=configurable.max_structured_output_retries)
+            .with_config(research_model_config)
+        )
+        
+        # Generate structured research brief from user messages
+        prompt_content = transform_messages_into_research_topic_prompt.format(
+            messages=get_buffer_string(state.get("messages", [])),
+            date=get_today_str()
+        )
+        response = await research_model.ainvoke([HumanMessage(content=prompt_content)])
+        research_brief = response.research_brief
+    else:
+        # Use plain text response for Heroku Inference API
+        research_model = configurable_model.with_config(research_model_config)
+        
+        # Enhanced prompt for plain text parsing
+        prompt_content = transform_messages_into_research_topic_prompt.format(
+            messages=get_buffer_string(state.get("messages", [])),
+            date=get_today_str()
+        ) + "\n\nPlease provide a clear, focused research brief that summarizes what needs to be researched."
+        
+        response = await research_model.ainvoke([HumanMessage(content=prompt_content)])
+        parsed_response = await parse_research_brief_response(response.content)
+        research_brief = parsed_response["research_brief"]
     
     # Step 3: Initialize supervisor with research brief and instructions
     supervisor_system_prompt = lead_researcher_prompt.format(
@@ -163,12 +251,12 @@ async def write_research_brief(state: AgentState, config: RunnableConfig) -> Com
     return Command(
         goto="research_supervisor", 
         update={
-            "research_brief": response.research_brief,
+            "research_brief": research_brief,
             "supervisor_messages": {
                 "type": "override",
                 "value": [
                     SystemMessage(content=supervisor_system_prompt),
-                    HumanMessage(content=response.research_brief)
+                    HumanMessage(content=research_brief)
                 ]
             }
         }
