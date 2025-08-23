@@ -52,6 +52,28 @@ from open_deep_research.utils import (
     think_tool,
 )
 
+
+def ensure_message_content_validity(messages):
+    """Ensure all AI messages have valid content for API compatibility.
+    
+    This function validates that all AI messages have non-empty content,
+    adding default content when necessary to satisfy OpenAI API requirements.
+    
+    Args:
+        messages: List of message objects to validate
+        
+    Returns:
+        List of validated messages with proper content
+    """
+    validated_messages = []
+    for message in messages:
+        if hasattr(message, 'content') and hasattr(message, 'tool_calls'):
+            # AI message with tool calls but empty content - add default content
+            if not message.content and getattr(message, 'tool_calls', None):
+                message.content = "Processing request and utilizing available tools."
+        validated_messages.append(message)
+    return validated_messages
+
 # Initialize a configurable model that we will use throughout the agent
 configurable_model = init_chat_model(
     configurable_fields=("model", "max_tokens", "api_key"),
@@ -332,14 +354,21 @@ async def supervisor(state: SupervisorState, config: RunnableConfig) -> Command[
         from langchain_core.messages import HumanMessage
         supervisor_messages = [HumanMessage(content="Please analyze the research requirements and begin the research process.")]
     
-    print(f"Debug: Sending {len(supervisor_messages)} messages to supervisor")
-    response = await research_model.ainvoke(supervisor_messages)
+    # Validate messages before sending to API to prevent content validation errors
+    validated_messages = ensure_message_content_validity(supervisor_messages)
+    print(f"Debug: Sending {len(validated_messages)} validated messages to supervisor")
+    response = await research_model.ainvoke(validated_messages)
     
-    # Step 3: Update state and proceed to tool execution
+    # Step 3: Ensure response has valid content for API compatibility
+    if hasattr(response, 'content') and not response.content:
+        # Add default content for AI messages with tool calls to satisfy API requirements
+        response.content = "Analyzing research requirements and planning next steps."
+    
+    # Step 4: Update state with proper message chain and proceed to tool execution
     return Command(
         goto="supervisor_tools",
         update={
-            "supervisor_messages": [response],
+            "supervisor_messages": validated_messages + [response],
             "research_iterations": state.get("research_iterations", 0) + 1
         }
     )
@@ -463,11 +492,12 @@ async def supervisor_tools(state: SupervisorState, config: RunnableConfig) -> Co
                     }
                 )
     
-    # Step 3: Return command with all tool results
+    # Step 3: Return command with all tool results appended to message history
     print(f"Debug: Adding {len(all_tool_messages)} tool messages")
     if hasattr(most_recent_message, 'tool_calls'):
         print(f"Debug: Previous message had {len(most_recent_message.tool_calls)} tool calls")
     
+    # Append tool messages to existing supervisor message chain
     update_payload["supervisor_messages"] = all_tool_messages
     return Command(
         goto="supervisor",
