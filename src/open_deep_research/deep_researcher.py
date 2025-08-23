@@ -327,10 +327,18 @@ async def supervisor(state: SupervisorState, config: RunnableConfig) -> Command[
     # Step 2: Generate supervisor response based on current context
     supervisor_messages = state.get("supervisor_messages", [])
     
-    # Debug: Filter out any messages with empty content to prevent API errors
+    # Filter out empty messages but preserve AI messages with tool calls
     filtered_messages = []
     for i, msg in enumerate(supervisor_messages):
+        # Keep messages with content
         if hasattr(msg, 'content') and msg.content and msg.content.strip():
+            filtered_messages.append(msg)
+        # Keep AI messages with tool calls even if content is empty
+        elif hasattr(msg, 'tool_calls') and msg.tool_calls:
+            print(f"Debug: Keeping AI message with tool calls at index {i} despite empty content")
+            filtered_messages.append(msg)
+        # Keep tool messages (they need content but we handle them separately)
+        elif hasattr(msg, 'tool_call_id'):
             filtered_messages.append(msg)
         else:
             print(f"Debug: Filtering out empty message at index {i}: {msg}")
