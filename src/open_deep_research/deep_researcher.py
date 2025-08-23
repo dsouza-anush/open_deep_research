@@ -65,6 +65,14 @@ async def parse_clarification_response(response_content: str) -> dict:
     """Parse clarification response from plain text when structured output isn't available."""
     import re
     
+    # Ensure we have content to work with
+    if not response_content or not response_content.strip():
+        return {
+            "need_clarification": False,
+            "question": "Could you provide more details about what you'd like me to research?",
+            "verification": "I understand your request and will proceed with the research."
+        }
+    
     # Look for clarification indicators
     need_clarification = any(phrase in response_content.lower() for phrase in [
         "need clarification", "unclear", "ambiguous", "could you clarify", 
@@ -75,8 +83,19 @@ async def parse_clarification_response(response_content: str) -> dict:
     questions = re.findall(r'[.!?]*\s*([^.!?]*\?)', response_content)
     question = questions[0].strip() if questions else "Could you provide more details about what you'd like me to research?"
     
-    # Create verification message
-    verification = "I understand your request and will proceed with the research."
+    # Ensure question is not empty
+    if not question.strip():
+        question = "Could you provide more details about what you'd like me to research?"
+    
+    # Create verification message - use original response if it seems reasonable
+    if not need_clarification and response_content.strip():
+        verification = response_content.strip()
+    else:
+        verification = "I understand your request and will proceed with the research."
+    
+    # Ensure verification is not empty
+    if not verification.strip():
+        verification = "I understand your request and will proceed with the research."
     
     return {
         "need_clarification": need_clarification,
@@ -170,18 +189,22 @@ async def clarify_with_user(state: AgentState, config: RunnableConfig) -> Comman
 
 async def parse_research_brief_response(response_content: str) -> dict:
     """Parse research brief from plain text when structured output isn't available."""
-    # Extract the research brief from the response
-    # Look for the main research topic/question in the response
-    lines = response_content.strip().split('\n')
+    # Ensure we have content to work with
+    if not response_content or not response_content.strip():
+        return {"research_brief": "Research the user's query comprehensively using available sources."}
     
-    # Use the full response as research brief, or extract the main point
+    # Extract the research brief from the response
     research_brief = response_content.strip()
     
     # Clean up the research brief if it contains meta-commentary
     if "research brief:" in research_brief.lower():
-        parts = research_brief.lower().split("research brief:")
+        parts = research_brief.split("research brief:", 1)
         if len(parts) > 1:
             research_brief = parts[1].strip()
+    
+    # Ensure research brief is not empty
+    if not research_brief.strip():
+        research_brief = "Research the user's query comprehensively using available sources."
     
     return {"research_brief": research_brief}
 
@@ -247,6 +270,10 @@ async def write_research_brief(state: AgentState, config: RunnableConfig) -> Com
         max_concurrent_research_units=configurable.max_concurrent_research_units,
         max_researcher_iterations=configurable.max_researcher_iterations
     )
+    
+    # Ensure research brief is not empty
+    if not research_brief.strip():
+        research_brief = "Research the user's query comprehensively using available sources."
     
     return Command(
         goto="research_supervisor", 
