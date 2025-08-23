@@ -327,29 +327,13 @@ async def supervisor(state: SupervisorState, config: RunnableConfig) -> Command[
     # Step 2: Generate supervisor response based on current context
     supervisor_messages = state.get("supervisor_messages", [])
     
-    # Filter out empty messages but preserve AI messages with tool calls
-    filtered_messages = []
-    for i, msg in enumerate(supervisor_messages):
-        # Check if message has tool calls first (highest priority)
-        if hasattr(msg, 'tool_calls') and msg.tool_calls:
-            print(f"Debug: Keeping AI message with tool calls at index {i} (content: '{msg.content if hasattr(msg, 'content') else 'N/A'}')")
-            filtered_messages.append(msg)
-        # Check if message has tool_call_id (tool result messages)
-        elif hasattr(msg, 'tool_call_id'):
-            print(f"Debug: Keeping tool result message at index {i}")
-            filtered_messages.append(msg)
-        # Keep messages with non-empty content
-        elif hasattr(msg, 'content') and msg.content is not None and msg.content.strip():
-            filtered_messages.append(msg)
-        else:
-            print(f"Debug: Filtering out empty message at index {i}: content='{msg.content if hasattr(msg, 'content') else 'N/A'}', has_tool_calls={hasattr(msg, 'tool_calls')}")
-    
-    # Ensure we have at least one message
-    if not filtered_messages:
+    # Ensure we have at least one message - but don't filter out tool calling sequences
+    if not supervisor_messages:
         from langchain_core.messages import HumanMessage
-        filtered_messages = [HumanMessage(content="Please analyze the research requirements and begin the research process.")]
+        supervisor_messages = [HumanMessage(content="Please analyze the research requirements and begin the research process.")]
     
-    response = await research_model.ainvoke(filtered_messages)
+    print(f"Debug: Sending {len(supervisor_messages)} messages to supervisor")
+    response = await research_model.ainvoke(supervisor_messages)
     
     # Step 3: Update state and proceed to tool execution
     return Command(
@@ -480,22 +464,11 @@ async def supervisor_tools(state: SupervisorState, config: RunnableConfig) -> Co
                 )
     
     # Step 3: Return command with all tool results
-    # Filter out any messages with empty content to prevent API errors
-    filtered_tool_messages = []
-    for msg in all_tool_messages:
-        if hasattr(msg, 'content') and msg.content and msg.content.strip():
-            filtered_tool_messages.append(msg)
-        else:
-            print(f"Debug: Filtering out empty tool message: {msg}")
+    print(f"Debug: Adding {len(all_tool_messages)} tool messages")
+    if hasattr(most_recent_message, 'tool_calls'):
+        print(f"Debug: Previous message had {len(most_recent_message.tool_calls)} tool calls")
     
-    # Ensure we have the right number of tool results for tool calls
-    if filtered_tool_messages:
-        # Debug: Check tool call/result pairing
-        print(f"Debug: Adding {len(filtered_tool_messages)} tool messages")
-        if hasattr(most_recent_message, 'tool_calls'):
-            print(f"Debug: Previous message had {len(most_recent_message.tool_calls)} tool calls")
-    
-    update_payload["supervisor_messages"] = filtered_tool_messages
+    update_payload["supervisor_messages"] = all_tool_messages
     return Command(
         goto="supervisor",
         update=update_payload
