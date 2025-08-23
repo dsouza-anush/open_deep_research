@@ -424,6 +424,51 @@
             messageInput.value = '';
         }
 
+        async function pollResearchStatus(jobId) {
+            const maxAttempts = 120; // 2 minutes max polling
+            let attempts = 0;
+            
+            while (attempts < maxAttempts) {
+                try {
+                    const response = await fetch(`/research/status/${jobId}`);
+                    const status = await response.json();
+                    
+                    // Update loading message with progress
+                    const loadingSpan = document.querySelector('#loading span');
+                    if (loadingSpan && status.progress) {
+                        loadingSpan.textContent = status.progress;
+                    }
+                    
+                    if (status.status === 'completed') {
+                        if (status.result) {
+                            addMessage(status.result, 'assistant', true);
+                        } else {
+                            addErrorMessage('Research completed but no report was generated');
+                        }
+                        setResearching(false);
+                        return;
+                    } else if (status.status === 'failed') {
+                        addErrorMessage(status.error || 'Research failed');
+                        setResearching(false);
+                        return;
+                    }
+                    
+                    // Wait 1 second before next poll
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    attempts++;
+                    
+                } catch (error) {
+                    addErrorMessage('Error checking research status: ' + error.message);
+                    setResearching(false);
+                    return;
+                }
+            }
+            
+            // Timeout after max attempts
+            addErrorMessage('Research is taking longer than expected. Please try again.');
+            setResearching(false);
+        }
+
         async function sendMessage() {
             const query = messageInput.value.trim();
             if (!query || isResearching) return;
@@ -440,7 +485,8 @@
             setResearching(true);
 
             try {
-                const response = await fetch('/research', {
+                // Start async research job
+                const response = await fetch('/research/async', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -450,16 +496,16 @@
 
                 const data = await response.json();
                 
-                if (data.success) {
-                    addMessage(data.report, 'assistant', true);
+                if (data.status === 'pending') {
+                    // Poll for results
+                    await pollResearchStatus(data.job_id);
                 } else {
-                    addErrorMessage(data.error || 'Research failed');
+                    addErrorMessage(data.message || 'Failed to start research');
                 }
             } catch (error) {
                 addErrorMessage('Network error: ' + error.message);
+                setResearching(false);
             }
-
-            setResearching(false);
         }
 
         function parseMarkdown(text) {
