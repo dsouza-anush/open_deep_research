@@ -425,7 +425,7 @@
         }
 
         async function pollResearchStatus(jobId) {
-            const maxAttempts = 120; // 2 minutes max polling
+            const maxAttempts = 300; // 5 minutes max polling
             let attempts = 0;
             
             while (attempts < maxAttempts) {
