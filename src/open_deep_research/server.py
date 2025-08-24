@@ -65,29 +65,59 @@ class JobStatusResponse(BaseModel):
 # In-memory job storage (in production, use Redis or database)
 jobs_storage = {}
 
-async def run_research_background(job_id: str, query: str, config_dict: Dict):
+def run_research_background_sync(job_id: str, query: str, config_dict: Dict):
+    """Synchronous wrapper to run async research in background."""
+    import asyncio
+    
+    print(f"DEBUG: Synchronous wrapper called for job {job_id}")
+    
+    # Create new event loop for this background task
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    try:
+        print(f"DEBUG: Running async research in new event loop for job {job_id}")
+        result = loop.run_until_complete(run_research_background_async(job_id, query, config_dict))
+        print(f"DEBUG: Async research completed for job {job_id}")
+        return result
+    except Exception as e:
+        print(f"ERROR: Exception in sync wrapper for job {job_id}: {str(e)}")
+        # Update job as failed
+        if job_id in jobs_storage:
+            jobs_storage[job_id]["status"] = "failed"
+            jobs_storage[job_id]["error"] = str(e)
+            jobs_storage[job_id]["progress"] = f"Background task failed: {str(e)}"
+            jobs_storage[job_id]["updated_at"] = time.time()
+    finally:
+        print(f"DEBUG: Closing event loop for job {job_id}")
+        loop.close()
+
+async def run_research_background_async(job_id: str, query: str, config_dict: Dict):
     """Run research in background and update job status."""
     import traceback
     
     try:
         print(f"DEBUG: Starting background research for job {job_id} with query: {query}")
         
+        # Ensure job exists in storage
+        if job_id not in jobs_storage:
+            print(f"ERROR: Job {job_id} not found in storage during background execution")
+            return
+        
         # Update job status to in_progress
         jobs_storage[job_id]["status"] = "in_progress"
         jobs_storage[job_id]["progress"] = "Starting research analysis..."
         jobs_storage[job_id]["updated_at"] = time.time()
-        
-        print(f"DEBUG: Creating configuration with config_dict: {config_dict}")
+        print(f"DEBUG: Updated job {job_id} to in_progress")
         
         # Create configuration
+        print(f"DEBUG: Creating configuration with config_dict: {config_dict}")
         configuration = Configuration(**config_dict)
-        
-        print(f"DEBUG: Configuration created successfully: {configuration.model_dump()}")
+        print(f"DEBUG: Configuration created successfully")
         
         # Update progress
-        jobs_storage[job_id]["progress"] = "Initializing research workflow..."
+        jobs_storage[job_id]["progress"] = "Research workflow started..."
         jobs_storage[job_id]["updated_at"] = time.time()
-        
         print(f"DEBUG: About to invoke deep_researcher.ainvoke")
         
         # Run the research
@@ -134,10 +164,11 @@ async def run_research_background(job_id: str, query: str, config_dict: Dict):
         print(f"ERROR: Full traceback:\n{error_trace}")
         
         # Update job as failed
-        jobs_storage[job_id]["status"] = "failed"
-        jobs_storage[job_id]["error"] = f"{str(e)}\n\nTraceback:\n{error_trace}"
-        jobs_storage[job_id]["progress"] = f"Research failed: {str(e)}"
-        jobs_storage[job_id]["updated_at"] = time.time()
+        if job_id in jobs_storage:
+            jobs_storage[job_id]["status"] = "failed"
+            jobs_storage[job_id]["error"] = f"{str(e)}\n\nTraceback:\n{error_trace}"
+            jobs_storage[job_id]["progress"] = f"Research failed: {str(e)}"
+            jobs_storage[job_id]["updated_at"] = time.time()
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
@@ -256,8 +287,8 @@ async def start_research_async(request: ResearchRequest, background_tasks: Backg
             "query": request.query
         }
         
-        # Start background task
-        background_tasks.add_task(run_research_background, job_id, request.query, config_dict)
+        # Start background task with synchronous wrapper
+        background_tasks.add_task(run_research_background_sync, job_id, request.query, config_dict)
         
         return ResearchJobResponse(
             job_id=job_id,
@@ -275,11 +306,21 @@ async def start_research_async(request: ResearchRequest, background_tasks: Backg
 @app.get("/research/status/{job_id}", response_model=JobStatusResponse)
 async def get_research_status(job_id: str):
     """Get status of research job."""
+    print(f"DEBUG: Status check for job {job_id}")
+    print(f"DEBUG: Jobs in storage: {list(jobs_storage.keys())}")
+    
     if job_id not in jobs_storage:
+        print(f"DEBUG: Job {job_id} not found in storage")
         raise HTTPException(status_code=404, detail="Job not found")
     
     job_data = jobs_storage[job_id]
+    print(f"DEBUG: Returning job data: {job_data}")
     return JobStatusResponse(**job_data)
+
+@app.get("/debug/jobs")
+async def debug_jobs():
+    """DEBUG: List all jobs in storage."""
+    return {"jobs": list(jobs_storage.keys()), "storage": jobs_storage}
 
 @app.get("/config")
 async def get_config():
