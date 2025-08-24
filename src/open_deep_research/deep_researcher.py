@@ -813,13 +813,19 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
             }
             
         except Exception as e:
+            print(f"ERROR: Final report generation failed: {type(e).__name__}: {str(e)}")
+            import traceback
+            print(f"ERROR: Full traceback:\n{traceback.format_exc()}")
+            
             # Handle token limit exceeded errors with progressive truncation
             if is_token_limit_exceeded(e, configurable.final_report_model):
+                print(f"INFO: Token limit exceeded, attempting retry {current_retry + 1}/{max_retries}")
                 current_retry += 1
                 
                 if current_retry == 1:
                     # First retry: determine initial truncation limit
                     model_token_limit = get_model_token_limit(configurable.final_report_model)
+                    print(f"INFO: Model token limit: {model_token_limit}")
                     if not model_token_limit:
                         return {
                             "final_report": f"Error generating final report: Token limit exceeded, however, we could not determine the model's maximum context length. Please update the model map in deep_researcher/utils.py with this information. {e}",
@@ -828,25 +834,30 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
                         }
                     # Use 4x token limit as character approximation for truncation
                     findings_token_limit = model_token_limit * 4
+                    print(f"INFO: Setting initial findings limit to {findings_token_limit} characters")
                 else:
                     # Subsequent retries: reduce by 10% each time
                     findings_token_limit = int(findings_token_limit * 0.9)
+                    print(f"INFO: Reducing findings limit to {findings_token_limit} characters")
                 
                 # Truncate findings and retry
                 findings = findings[:findings_token_limit]
+                print(f"INFO: Truncated findings to {len(findings)} characters, retrying...")
                 continue
             else:
                 # Non-token-limit error: return error immediately
+                print(f"ERROR: Non-token-limit error in final report generation, failing immediately")
                 return {
-                    "final_report": f"Error generating final report: {e}",
-                    "messages": [AIMessage(content="Report generation failed due to an error")],
+                    "final_report": f"Error generating final report: {type(e).__name__}: {str(e)}",
+                    "messages": [AIMessage(content=f"Report generation failed: {type(e).__name__}: {str(e)}")],
                     **cleared_state
                 }
     
     # Step 4: Return failure result if all retries exhausted
+    print(f"ERROR: Final report generation failed after {max_retries} retries")
     return {
-        "final_report": "Error generating final report: Maximum retries exceeded",
-        "messages": [AIMessage(content="Report generation failed after maximum retries")],
+        "final_report": f"Error generating final report: Maximum retries ({max_retries}) exceeded due to token limits",
+        "messages": [AIMessage(content=f"Report generation failed after {max_retries} retries due to token limits")],
         **cleared_state
     }
 
