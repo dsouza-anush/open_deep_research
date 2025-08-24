@@ -45,8 +45,11 @@ except ImportError:
     logging.warning("langchain_brightdata not installed. Bright Data search will be unavailable.")
 
 BRIGHT_DATA_SEARCH_DESCRIPTION = (
-    "A comprehensive web search and scraping engine powered by Bright Data's proxy network. "
-    "Useful for when you need to answer questions about current events and gather detailed information."
+    "Search the web and scrape current information using Bright Data's enterprise proxy network. "
+    "Use this tool to find real-time data, current news, stock prices, market information, "
+    "product details, company information, and any other up-to-date web content. "
+    "Particularly effective for financial data, news articles, and current events. "
+    "Always use this tool when you need current, real-time information that may not be in your training data."
 )
 
 @tool(description=BRIGHT_DATA_SEARCH_DESCRIPTION)
@@ -67,24 +70,32 @@ async def brightdata_search(
     Returns:
         Formatted string containing summarized search results
     """
+    print(f"DEBUG: Bright Data search called with queries: {queries}, topic: {topic}")
+    
     if not BRIGHTDATA_AVAILABLE:
+        print("ERROR: Bright Data integration is not available - package not installed")
         return "Bright Data integration is not available. Please install langchain_brightdata package."
     
     # Get API key
     api_key = get_brightdata_api_key(config)
+    print(f"DEBUG: API key retrieved: {'Present' if api_key else 'Missing'}")
     if not api_key:
+        print("ERROR: Bright Data API key not configured")
         return "Bright Data API key not configured. Please set BRIGHTDATA_API_KEY environment variable."
     
     # Initialize Bright Data scraper
+    print("DEBUG: Initializing Bright Data scraper...")
     scraper = BrightDataWebScraperAPI(bright_data_api_key=api_key)
     
     # Step 1: Execute search queries and scrape results
+    print(f"DEBUG: Starting search for {len(queries)} queries...")
     search_results = await brightdata_search_async(
         queries,
         max_results=max_results,
         topic=topic,
         scraper=scraper
     )
+    print(f"DEBUG: Search completed, got {len(search_results)} results")
     
     # Step 2: Deduplicate results by URL to avoid processing the same content multiple times
     unique_results = {}
