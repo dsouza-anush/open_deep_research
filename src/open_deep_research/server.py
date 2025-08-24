@@ -67,18 +67,28 @@ jobs_storage = {}
 
 async def run_research_background(job_id: str, query: str, config_dict: Dict):
     """Run research in background and update job status."""
+    import traceback
+    
     try:
+        print(f"DEBUG: Starting background research for job {job_id} with query: {query}")
+        
         # Update job status to in_progress
         jobs_storage[job_id]["status"] = "in_progress"
         jobs_storage[job_id]["progress"] = "Starting research analysis..."
         jobs_storage[job_id]["updated_at"] = time.time()
         
+        print(f"DEBUG: Creating configuration with config_dict: {config_dict}")
+        
         # Create configuration
         configuration = Configuration(**config_dict)
+        
+        print(f"DEBUG: Configuration created successfully: {configuration.model_dump()}")
         
         # Update progress
         jobs_storage[job_id]["progress"] = "Initializing research workflow..."
         jobs_storage[job_id]["updated_at"] = time.time()
+        
+        print(f"DEBUG: About to invoke deep_researcher.ainvoke")
         
         # Run the research
         result = await deep_researcher.ainvoke(
@@ -86,13 +96,29 @@ async def run_research_background(job_id: str, query: str, config_dict: Dict):
             config={"configurable": configuration.model_dump()}
         )
         
+        print(f"DEBUG: Deep researcher completed. Result type: {type(result)}")
+        print(f"DEBUG: Result keys: {result.keys() if isinstance(result, dict) else 'Not a dict'}")
+        
+        # Update progress after research completion
+        jobs_storage[job_id]["progress"] = "Processing research results..."
+        jobs_storage[job_id]["updated_at"] = time.time()
+        
         # Extract the final research report
         report = None
         if result and "messages" in result:
-            for message in reversed(result["messages"]):
-                if hasattr(message, "content") and message.content:
-                    report = message.content
-                    break
+            print(f"DEBUG: Found {len(result['messages'])} messages in result")
+            for i, message in enumerate(reversed(result["messages"])):
+                print(f"DEBUG: Message {i}: type={type(message)}, has_content={hasattr(message, 'content')}")
+                if hasattr(message, "content"):
+                    print(f"DEBUG: Message {i} content length: {len(str(message.content)) if message.content else 0}")
+                    if message.content:
+                        report = message.content
+                        print(f"DEBUG: Using message {i} as final report")
+                        break
+        else:
+            print(f"DEBUG: No messages found in result or result is None")
+        
+        print(f"DEBUG: Final report length: {len(str(report)) if report else 0}")
         
         # Update job as completed
         jobs_storage[job_id]["status"] = "completed"
@@ -100,10 +126,16 @@ async def run_research_background(job_id: str, query: str, config_dict: Dict):
         jobs_storage[job_id]["progress"] = "Research completed successfully"
         jobs_storage[job_id]["updated_at"] = time.time()
         
+        print(f"DEBUG: Job {job_id} completed successfully")
+        
     except Exception as e:
+        error_trace = traceback.format_exc()
+        print(f"ERROR: Exception in background research for job {job_id}: {str(e)}")
+        print(f"ERROR: Full traceback:\n{error_trace}")
+        
         # Update job as failed
         jobs_storage[job_id]["status"] = "failed"
-        jobs_storage[job_id]["error"] = str(e)
+        jobs_storage[job_id]["error"] = f"{str(e)}\n\nTraceback:\n{error_trace}"
         jobs_storage[job_id]["progress"] = f"Research failed: {str(e)}"
         jobs_storage[job_id]["updated_at"] = time.time()
 
