@@ -873,7 +873,17 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
             print(f"ERROR: Full traceback:\n{traceback.format_exc()}")
             
             # Handle API timeout errors specifically
-            if "timeout" in str(e).lower() or "408" in str(e) or "timed out" in str(e).lower():
+            error_str = str(e).lower()
+            exception_type = type(e).__name__
+            is_timeout_error = (
+                "timeout" in error_str or 
+                "408" in str(e) or 
+                "timed out" in error_str or
+                "apistatuserror" in exception_type.lower() and "408" in str(e) or
+                "request timed out" in error_str
+            )
+            
+            if is_timeout_error:
                 print("WARNING: API timeout detected, generating fallback report")
                 fallback_report = generate_fallback_report(
                     state.get("research_brief", ""), 
