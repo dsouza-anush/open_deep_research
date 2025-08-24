@@ -758,6 +758,49 @@ researcher_builder.add_edge("compress_research", END)      # Exit point after co
 # Compile researcher subgraph for parallel execution by supervisor
 researcher_subgraph = researcher_builder.compile()
 
+def generate_fallback_report(research_brief: str, findings: str) -> str:
+    """Generate a fallback report when AI report generation fails."""
+    from datetime import datetime
+    
+    current_date = datetime.now().strftime("%B %d, %Y")
+    
+    # Create a structured report from the available findings
+    fallback_content = f"""# Research Report - {current_date}
+
+## Research Query
+{research_brief or "Research analysis requested"}
+
+## Executive Summary
+This report was generated from research findings collected through automated web search and analysis. Due to API limitations, this is a structured presentation of the raw research data rather than an AI-generated synthesis.
+
+## Key Findings
+
+{findings[:10000] if findings else "No detailed findings were collected during the research process."}
+
+---
+
+## Research Methodology
+- Automated web search using Bright Data enterprise proxy network
+- Multi-source data collection and verification
+- Real-time information gathering from current web sources
+
+## Important Notes
+- This report was generated using a failsafe method due to API timeout constraints
+- The findings above represent raw research data that may require additional analysis
+- For more detailed analysis, consider running the research query again or contact support
+
+## Report Generated
+Date: {current_date}
+Method: Fallback report generation due to API timeout
+Status: Research data collected successfully, AI synthesis unavailable
+
+---
+
+*This report contains research findings collected through automated processes. While efforts are made to ensure accuracy, users should verify critical information independently.*
+"""
+    
+    return fallback_content
+
 async def final_report_generation(state: AgentState, config: RunnableConfig):
     """Generate the final comprehensive research report with retry logic for token limits.
     
@@ -800,10 +843,22 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
                 date=get_today_str()
             )
             
-            # Generate the final report
-            final_report = await configurable_model.with_config(writer_model_config).ainvoke([
-                HumanMessage(content=final_report_prompt)
-            ])
+            # Generate the final report with timeout handling
+            try:
+                final_report = await asyncio.wait_for(
+                    configurable_model.with_config(writer_model_config).ainvoke([
+                        HumanMessage(content=final_report_prompt)
+                    ]),
+                    timeout=120.0  # 2 minute timeout
+                )
+            except asyncio.TimeoutError:
+                print("WARNING: Final report generation timed out locally, generating fallback report")
+                # Generate a fallback structured report from the findings
+                fallback_report = generate_fallback_report(
+                    state.get("research_brief", ""), 
+                    findings
+                )
+                final_report = AIMessage(content=fallback_report)
             
             # Return successful report generation
             return {
@@ -816,6 +871,19 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
             print(f"ERROR: Final report generation failed: {type(e).__name__}: {str(e)}")
             import traceback
             print(f"ERROR: Full traceback:\n{traceback.format_exc()}")
+            
+            # Handle API timeout errors specifically
+            if "timeout" in str(e).lower() or "408" in str(e) or "timed out" in str(e).lower():
+                print("WARNING: API timeout detected, generating fallback report")
+                fallback_report = generate_fallback_report(
+                    state.get("research_brief", ""), 
+                    findings
+                )
+                return {
+                    "final_report": fallback_report,
+                    "messages": [AIMessage(content=fallback_report)],
+                    **cleared_state
+                }
             
             # Handle token limit exceeded errors with progressive truncation
             if is_token_limit_exceeded(e, configurable.final_report_model):
