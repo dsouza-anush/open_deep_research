@@ -290,6 +290,41 @@ async def get_config():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+async def test_background_task(job_id: str):
+    """Simple test background task."""
+    print(f"DEBUG: Test background task started for job {job_id}")
+    import asyncio
+    await asyncio.sleep(2)
+    print(f"DEBUG: Test background task completing for job {job_id}")
+    jobs_storage[job_id]["status"] = "completed"
+    jobs_storage[job_id]["result"] = "Test task completed successfully!"
+    jobs_storage[job_id]["progress"] = "Test completed"
+    jobs_storage[job_id]["updated_at"] = time.time()
+    print(f"DEBUG: Test background task finished for job {job_id}")
+
+@app.post("/test/async")
+async def test_async_task(background_tasks: BackgroundTasks):
+    """Test background task execution."""
+    job_id = str(uuid.uuid4())
+    
+    # Initialize job in storage
+    current_time = time.time()
+    jobs_storage[job_id] = {
+        "job_id": job_id,
+        "status": "pending",
+        "progress": "Test task queued",
+        "result": None,
+        "error": None,
+        "created_at": current_time,
+        "updated_at": current_time,
+        "query": "test"
+    }
+    
+    print(f"DEBUG: Starting test background task for job {job_id}")
+    background_tasks.add_task(test_background_task, job_id)
+    
+    return {"job_id": job_id, "status": "pending", "message": "Test task started"}
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
