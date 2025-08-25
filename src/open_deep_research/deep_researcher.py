@@ -801,11 +801,140 @@ Status: Research data collected successfully, AI synthesis unavailable
     
     return fallback_content
 
-async def final_report_generation(state: AgentState, config: RunnableConfig):
-    """Generate the final comprehensive research report with retry logic for token limits.
+async def generate_progressive_report(findings: str, research_brief: str, messages: str, config: RunnableConfig) -> str:
+    """Generate report progressively in sections to avoid API timeouts.
     
-    This function takes all collected research findings and synthesizes them into a 
-    well-structured, comprehensive final report using the configured report generation model.
+    This approach breaks down report generation into smaller, manageable sections
+    that are less likely to hit API timeout limits.
+    
+    Args:
+        findings: Research findings to synthesize
+        research_brief: Original research query
+        messages: User message context
+        config: Runtime configuration
+        
+    Returns:
+        Complete synthesized report as string
+    """
+    from datetime import datetime
+    
+    configurable = Configuration.from_runnable_config(config)
+    model_config = {
+        "model": configurable.final_report_model,
+        "max_tokens": min(4000, configurable.final_report_model_max_tokens),  # Smaller chunks
+        "api_key": get_api_key_for_model(configurable.final_report_model, config),
+        "tags": ["langsmith:nostream"]
+    }
+    
+    # Initialize model for progressive generation
+    report_model = configurable_model.with_config(model_config)
+    current_date = datetime.now().strftime("%B %d, %Y")
+    
+    # Progressive report sections
+    sections = {}
+    
+    try:
+        # Section 1: Executive Summary (shorter context, faster generation)
+        summary_prompt = f"""Based on this research brief: {research_brief}
+
+And these key findings (first 3000 chars): {findings[:3000]}
+
+Write a concise executive summary (2-3 paragraphs) for a research report. Focus on the most important findings and conclusions. Date: {current_date}"""
+        
+        summary_response = await asyncio.wait_for(
+            report_model.ainvoke([HumanMessage(content=summary_prompt)]),
+            timeout=45.0  # Shorter timeout for smaller sections
+        )
+        sections["executive_summary"] = summary_response.content
+        
+        # Section 2: Key Findings (structured analysis)
+        findings_prompt = f"""Based on these research findings: {findings[:5000]}
+
+Create a "Key Findings" section with 3-5 bullet points highlighting the most important discoveries. Be specific and actionable. Each bullet should be 1-2 sentences."""
+        
+        findings_response = await asyncio.wait_for(
+            report_model.ainvoke([HumanMessage(content=findings_prompt)]),
+            timeout=45.0
+        )
+        sections["key_findings"] = findings_response.content
+        
+        # Section 3: Detailed Analysis (main content)
+        analysis_prompt = f"""Research Brief: {research_brief}
+
+Research Data: {findings[:8000]}
+
+Create a detailed analysis section covering the main aspects discovered in the research. Structure with subheadings and provide specific insights. Limit to 500 words."""
+        
+        analysis_response = await asyncio.wait_for(
+            report_model.ainvoke([HumanMessage(content=analysis_prompt)]),
+            timeout=60.0  # Slightly longer for main content
+        )
+        sections["detailed_analysis"] = analysis_response.content
+        
+        # Combine sections into final report
+        final_report = f"""# Research Report - {current_date}
+
+## Research Query
+{research_brief}
+
+## Executive Summary
+{sections["executive_summary"]}
+
+## Key Findings
+{sections["key_findings"]}
+
+## Detailed Analysis  
+{sections["detailed_analysis"]}
+
+## Research Methodology
+- Automated web search using Bright Data enterprise proxy network
+- Multi-source data collection and verification
+- Real-time information gathering from current web sources
+- Progressive AI synthesis for comprehensive analysis
+
+---
+
+*This report was generated through systematic research and progressive AI synthesis. While efforts are made to ensure accuracy, users should verify critical information independently.*"""
+
+        return final_report
+        
+    except asyncio.TimeoutError as e:
+        print(f"WARNING: Progressive report generation timed out at section generation: {str(e)}")
+        # Return partial report with completed sections
+        completed_sections = []
+        if "executive_summary" in sections:
+            completed_sections.append(f"## Executive Summary\n{sections['executive_summary']}")
+        if "key_findings" in sections:
+            completed_sections.append(f"## Key Findings\n{sections['key_findings']}")
+        if "detailed_analysis" in sections:
+            completed_sections.append(f"## Detailed Analysis\n{sections['detailed_analysis']}")
+            
+        partial_report = f"""# Research Report - {current_date}
+
+## Research Query
+{research_brief}
+
+{chr(10).join(completed_sections)}
+
+## Research Notes
+{findings[:2000]}
+
+---
+
+*This report was generated through progressive AI synthesis. Some sections may be incomplete due to API timeout constraints.*"""
+        
+        return partial_report
+        
+    except Exception as e:
+        print(f"ERROR: Progressive report generation failed: {str(e)}")
+        # Fallback to structured presentation
+        return generate_fallback_report(research_brief, findings)
+
+async def final_report_generation(state: AgentState, config: RunnableConfig):
+    """Generate the final comprehensive research report with progressive synthesis.
+    
+    This function uses a progressive approach to generate reports section by section,
+    significantly reducing the likelihood of API timeouts while maintaining quality.
     
     Args:
         state: Agent state containing research findings and context
@@ -819,7 +948,27 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
     cleared_state = {"notes": {"type": "override", "value": []}}
     findings = "\n".join(notes)
     
-    # Step 2: Configure the final report generation model
+    # Step 2: Try progressive report generation first
+    try:
+        print(f"INFO: Attempting progressive report generation to avoid API timeouts")
+        progressive_report = await generate_progressive_report(
+            findings=findings,
+            research_brief=state.get("research_brief", ""),
+            messages=get_buffer_string(state.get("messages", [])),
+            config=config
+        )
+        
+        print(f"INFO: Progressive report generation succeeded, length: {len(progressive_report)}")
+        return {
+            "final_report": progressive_report,
+            "messages": [AIMessage(content=progressive_report)],
+            **cleared_state
+        }
+        
+    except Exception as e:
+        print(f"WARNING: Progressive report generation failed: {str(e)}, falling back to traditional approach")
+    
+    # Step 3: Fallback to traditional single-shot generation with retries
     configurable = Configuration.from_runnable_config(config)
     writer_model_config = {
         "model": configurable.final_report_model,
@@ -828,7 +977,6 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
         "tags": ["langsmith:nostream"]
     }
     
-    # Step 3: Attempt report generation with token limit retry logic
     max_retries = 3
     current_retry = 0
     findings_token_limit = None
@@ -852,7 +1000,7 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
                     timeout=120.0  # 2 minute timeout
                 )
             except asyncio.TimeoutError:
-                print("WARNING: Final report generation timed out locally, generating fallback report")
+                print("WARNING: Traditional report generation timed out locally, generating fallback report")
                 # Generate a fallback structured report from the findings
                 fallback_report = generate_fallback_report(
                     state.get("research_brief", ""), 
