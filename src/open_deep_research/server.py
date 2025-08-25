@@ -9,7 +9,8 @@ from typing import Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
@@ -22,9 +23,14 @@ app = FastAPI(
     version="0.0.16"
 )
 
-# Setup templates
+# Setup templates and static files
 templates_dir = Path(__file__).parent / "templates"
+static_dir = Path(__file__).parent / "static"
 templates = Jinja2Templates(directory=str(templates_dir))
+
+# Mount static files for the new React UI
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # Add CORS middleware
 app.add_middleware(
@@ -173,7 +179,13 @@ async def run_research_background_async(job_id: str, query: str, config_dict: Di
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
     """Serve the web interface."""
-    return templates.TemplateResponse("index.html", {"request": request})
+    # Check if built React app exists
+    static_index = static_dir / "index.html"
+    if static_index.exists():
+        return FileResponse(str(static_index))
+    else:
+        # Fallback to original template
+        return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/health")
 async def health():
