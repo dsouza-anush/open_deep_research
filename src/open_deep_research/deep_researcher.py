@@ -801,6 +801,94 @@ Status: Research data collected successfully, AI synthesis unavailable
     
     return fallback_content
 
+async def generate_streaming_report(findings: str, research_brief: str, messages: str, config: RunnableConfig) -> str:
+    """Generate report using streaming to avoid API timeouts.
+    
+    Uses streaming responses which are specifically recommended by Heroku Inference API
+    for long-running requests to avoid 408 timeout errors.
+    
+    Args:
+        findings: Research findings to synthesize
+        research_brief: Original research query
+        messages: User message context
+        config: Runtime configuration
+        
+    Returns:
+        Complete synthesized report as string
+    """
+    from datetime import datetime
+    
+    configurable = Configuration.from_runnable_config(config)
+    
+    # Check if we're using Heroku Inference API (supports streaming)
+    is_heroku_api = is_heroku_inference_api(configurable.final_report_model)
+    
+    if not is_heroku_api:
+        print("INFO: Model doesn't support streaming, falling back to progressive generation")
+        return await generate_progressive_report(findings, research_brief, messages, config)
+    
+    model_config = {
+        "model": configurable.final_report_model,
+        "max_tokens": configurable.final_report_model_max_tokens,
+        "api_key": get_api_key_for_model(configurable.final_report_model, config),
+        "tags": ["langsmith:nostream"],
+        "stream": True  # Enable streaming
+    }
+    
+    current_date = datetime.now().strftime("%B %d, %Y")
+    
+    try:
+        # Create comprehensive prompt for streaming generation
+        streaming_prompt = f"""Generate a comprehensive research report based on the following information:
+
+Research Brief: {research_brief}
+
+Research Findings: {findings[:15000]}  # More content since streaming handles it better
+
+User Context: {messages[:2000]}
+
+Date: {current_date}
+
+Please generate a well-structured research report with the following sections:
+1. Executive Summary (2-3 paragraphs)
+2. Key Findings (3-5 bullet points)
+3. Detailed Analysis (with subheadings)
+4. Methodology and Sources
+
+Format the report in markdown with clear headings. Focus on actionable insights and specific findings from the research data."""
+
+        # Initialize streaming model
+        streaming_model = configurable_model.with_config(model_config)
+        
+        print("INFO: Starting streaming report generation...")
+        
+        # Collect streamed response
+        full_response = ""
+        async for chunk in streaming_model.astream([HumanMessage(content=streaming_prompt)]):
+            if hasattr(chunk, 'content') and chunk.content:
+                full_response += chunk.content
+        
+        print(f"INFO: Streaming report generation completed, length: {len(full_response)}")
+        
+        # Add report header and footer
+        final_report = f"""# Research Report - {current_date}
+
+## Research Query
+{research_brief}
+
+{full_response}
+
+---
+
+*This report was generated through streaming AI synthesis for comprehensive analysis. Research conducted using automated web search and multi-source data collection.*"""
+
+        return final_report
+        
+    except Exception as e:
+        print(f"ERROR: Streaming report generation failed: {str(e)}")
+        print("INFO: Falling back to progressive report generation")
+        return await generate_progressive_report(findings, research_brief, messages, config)
+
 async def generate_progressive_report(findings: str, research_brief: str, messages: str, config: RunnableConfig) -> str:
     """Generate report progressively in sections to avoid API timeouts.
     
@@ -948,9 +1036,29 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
     cleared_state = {"notes": {"type": "override", "value": []}}
     findings = "\n".join(notes)
     
-    # Step 2: Try progressive report generation first
+    # Step 2: Try streaming report generation first (recommended by Heroku Inference API)
     try:
-        print(f"INFO: Attempting progressive report generation to avoid API timeouts")
+        print(f"INFO: Attempting streaming report generation to avoid API timeouts")
+        streaming_report = await generate_streaming_report(
+            findings=findings,
+            research_brief=state.get("research_brief", ""),
+            messages=get_buffer_string(state.get("messages", [])),
+            config=config
+        )
+        
+        print(f"INFO: Streaming report generation succeeded, length: {len(streaming_report)}")
+        return {
+            "final_report": streaming_report,
+            "messages": [AIMessage(content=streaming_report)],
+            **cleared_state
+        }
+        
+    except Exception as e:
+        print(f"WARNING: Streaming report generation failed: {str(e)}, falling back to progressive approach")
+    
+    # Step 3: Try progressive report generation as fallback
+    try:
+        print(f"INFO: Attempting progressive report generation as fallback")
         progressive_report = await generate_progressive_report(
             findings=findings,
             research_brief=state.get("research_brief", ""),
@@ -968,7 +1076,7 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
     except Exception as e:
         print(f"WARNING: Progressive report generation failed: {str(e)}, falling back to traditional approach")
     
-    # Step 3: Fallback to traditional single-shot generation with retries
+    # Step 4: Fallback to traditional single-shot generation with retries
     configurable = Configuration.from_runnable_config(config)
     writer_model_config = {
         "model": configurable.final_report_model,
