@@ -20,20 +20,14 @@ logger = logging.getLogger(__name__)
 @cl.on_chat_start
 async def start():
     """Initialize session with configuration."""
-    config = Configuration()
+    # Use from_runnable_config to apply Heroku-specific settings (model, search API)
+    config = Configuration.from_runnable_config({})
     cl.user_session.set("config", config)
+    logger.info(f"Session config: model={config.research_model}, search={config.search_api}")
 
-    # Welcome message
+    # Welcome message - simple and clean
     await cl.Message(
-        content="# Welcome to Open Deep Research\n\n"
-        "I can conduct comprehensive research on any topic you're interested in. "
-        "Just ask me a question and I'll search the web, analyze sources, and provide "
-        "a detailed research report.\n\n"
-        "**Example queries:**\n"
-        "- What are the latest advancements in quantum computing?\n"
-        "- How does mRNA vaccine technology work?\n"
-        "- What is the current state of renewable energy adoption?\n\n"
-        "*Powered by Claude 4 Sonnet and Bright Data*"
+        content="Welcome to Deep Research. Ask me anything."
     ).send()
 
 
