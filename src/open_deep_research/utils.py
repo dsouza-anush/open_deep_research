@@ -33,6 +33,9 @@ from open_deep_research.configuration import Configuration, SearchAPI
 from open_deep_research.prompts import summarize_webpage_prompt
 from open_deep_research.state import ResearchComplete, Summary
 
+# Configure logger
+logger = logging.getLogger(__name__)
+
 ##########################
 # Bright Data Search Tool Utils
 ##########################
@@ -70,32 +73,26 @@ async def brightdata_search(
     Returns:
         Formatted string containing summarized search results
     """
-    print(f"DEBUG: Bright Data search called with queries: {queries}, topic: {topic}")
-    
+    logger.debug(f"Bright Data search called with queries: {queries}, topic: {topic}")
+
     if not BRIGHTDATA_AVAILABLE:
-        print("ERROR: Bright Data integration is not available - package not installed")
+        logger.error("Bright Data integration is not available - package not installed")
         return "Bright Data integration is not available. Please install langchain_brightdata package."
-    
-    # Get API key
+
     api_key = get_brightdata_api_key(config)
-    print(f"DEBUG: API key retrieved: {'Present' if api_key else 'Missing'}")
     if not api_key:
-        print("ERROR: Bright Data API key not configured")
+        logger.error("Bright Data API key not configured")
         return "Bright Data API key not configured. Please set BRIGHTDATA_API_KEY environment variable."
-    
-    # Initialize Bright Data scraper
-    print("DEBUG: Initializing Bright Data scraper...")
+
     scraper = BrightDataWebScraperAPI(bright_data_api_key=api_key)
-    
-    # Step 1: Execute search queries and scrape results
-    print(f"DEBUG: Starting search for {len(queries)} queries...")
+
     search_results = await brightdata_search_async(
         queries,
         max_results=max_results,
         topic=topic,
         scraper=scraper
     )
-    print(f"DEBUG: Search completed, got {len(search_results)} results")
+    logger.debug(f"Search completed, got {len(search_results)} results")
     
     # Step 2: Deduplicate results by URL to avoid processing the same content multiple times
     unique_results = {}

@@ -1,9 +1,13 @@
 """Main LangGraph implementation for the Deep Research agent."""
 
 import asyncio
+import logging
 from typing import Literal
 
 from langchain.chat_models import init_chat_model
+
+# Configure logging
+logger = logging.getLogger(__name__)
 from langchain_core.messages import (
     AIMessage,
     HumanMessage,
@@ -409,12 +413,10 @@ async def supervisor(state: SupervisorState, config: RunnableConfig) -> Command[
     
     # Ensure we have at least one message - but don't filter out tool calling sequences
     if not supervisor_messages:
-        from langchain_core.messages import HumanMessage
         supervisor_messages = [HumanMessage(content="Please analyze the research requirements and begin the research process.")]
-    
+
     # Validate messages before sending to API to prevent content validation errors
     validated_messages = ensure_message_content_validity(supervisor_messages)
-    print(f"Debug: Sending {len(validated_messages)} validated messages to supervisor")
     response = await research_model.ainvoke(validated_messages)
     
     # Step 3: Ensure response has valid content for API compatibility
@@ -540,7 +542,7 @@ async def supervisor_tools(state: SupervisorState, config: RunnableConfig) -> Co
                 
         except Exception as e:
             # Handle research execution errors
-            if is_token_limit_exceeded(e, configurable.research_model) or True:
+            if is_token_limit_exceeded(e, configurable.research_model):
                 # Token limit exceeded or other error - end research phase
                 return Command(
                     goto=END,
@@ -551,10 +553,6 @@ async def supervisor_tools(state: SupervisorState, config: RunnableConfig) -> Co
                 )
     
     # Step 3: Return command with all tool results appended to message history
-    print(f"Debug: Adding {len(all_tool_messages)} tool messages")
-    if hasattr(most_recent_message, 'tool_calls'):
-        print(f"Debug: Previous message had {len(most_recent_message.tool_calls)} tool calls")
-    
     # Append tool messages to existing supervisor message chain
     update_payload["supervisor_messages"] = all_tool_messages
     return Command(
@@ -884,7 +882,7 @@ async def generate_streaming_report(findings: str, research_brief: str, messages
     is_heroku_api = is_heroku_inference_api(configurable.final_report_model)
     
     if not is_heroku_api:
-        print("INFO: Model doesn't support streaming, falling back to progressive generation")
+        logger.info(" Model doesn't support streaming, falling back to progressive generation")
         return await generate_progressive_report(findings, research_brief, messages, config)
     
     model_config = {
@@ -920,7 +918,7 @@ Format the report in markdown with clear headings. Focus on actionable insights 
         # Initialize streaming model
         streaming_model = configurable_model.with_config(model_config)
         
-        print("INFO: Starting streaming report generation...")
+        logger.info(" Starting streaming report generation...")
         
         # Collect streamed response
         full_response = ""
@@ -928,7 +926,7 @@ Format the report in markdown with clear headings. Focus on actionable insights 
             if hasattr(chunk, 'content') and chunk.content:
                 full_response += chunk.content
         
-        print(f"INFO: Streaming report generation completed, length: {len(full_response)}")
+        logger.info(f" Streaming report generation completed, length: {len(full_response)}")
         
         # Add report header and footer
         final_report = f"""# Research Report - {current_date}
@@ -945,8 +943,8 @@ Format the report in markdown with clear headings. Focus on actionable insights 
         return final_report
         
     except Exception as e:
-        print(f"ERROR: Streaming report generation failed: {str(e)}")
-        print("INFO: Falling back to progressive report generation")
+        logger.error(f" Streaming report generation failed: {str(e)}")
+        logger.info(" Falling back to progressive report generation")
         return await generate_progressive_report(findings, research_brief, messages, config)
 
 async def generate_progressive_report(findings: str, research_brief: str, messages: str, config: RunnableConfig) -> str:
@@ -1047,7 +1045,7 @@ Create a detailed analysis section covering the main aspects discovered in the r
         return final_report
         
     except asyncio.TimeoutError as e:
-        print(f"WARNING: Progressive report generation timed out at section generation: {str(e)}")
+        logger.warning(f" Progressive report generation timed out at section generation: {str(e)}")
         # Return partial report with completed sections
         completed_sections = []
         if "executive_summary" in sections:
@@ -1074,7 +1072,7 @@ Create a detailed analysis section covering the main aspects discovered in the r
         return partial_report
         
     except Exception as e:
-        print(f"ERROR: Progressive report generation failed: {str(e)}")
+        logger.error(f" Progressive report generation failed: {str(e)}")
         # Fallback to structured presentation
         return generate_fallback_report(research_brief, findings)
 
@@ -1098,7 +1096,7 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
     
     # Step 2: Try streaming report generation first (recommended by Heroku Inference API)
     try:
-        print(f"INFO: Attempting streaming report generation to avoid API timeouts")
+        logger.info(f" Attempting streaming report generation to avoid API timeouts")
         streaming_report = await generate_streaming_report(
             findings=findings,
             research_brief=state.get("research_brief", ""),
@@ -1106,7 +1104,7 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
             config=config
         )
         
-        print(f"INFO: Streaming report generation succeeded, length: {len(streaming_report)}")
+        logger.info(f" Streaming report generation succeeded, length: {len(streaming_report)}")
         return {
             "final_report": streaming_report,
             "messages": [AIMessage(content=streaming_report)],
@@ -1114,11 +1112,11 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
         }
         
     except Exception as e:
-        print(f"WARNING: Streaming report generation failed: {str(e)}, falling back to progressive approach")
+        logger.warning(f" Streaming report generation failed: {str(e)}, falling back to progressive approach")
     
     # Step 3: Try progressive report generation as fallback
     try:
-        print(f"INFO: Attempting progressive report generation as fallback")
+        logger.info(f" Attempting progressive report generation as fallback")
         progressive_report = await generate_progressive_report(
             findings=findings,
             research_brief=state.get("research_brief", ""),
@@ -1126,7 +1124,7 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
             config=config
         )
         
-        print(f"INFO: Progressive report generation succeeded, length: {len(progressive_report)}")
+        logger.info(f" Progressive report generation succeeded, length: {len(progressive_report)}")
         return {
             "final_report": progressive_report,
             "messages": [AIMessage(content=progressive_report)],
@@ -1134,7 +1132,7 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
         }
         
     except Exception as e:
-        print(f"WARNING: Progressive report generation failed: {str(e)}, falling back to traditional approach")
+        logger.warning(f" Progressive report generation failed: {str(e)}, falling back to traditional approach")
     
     # Step 4: Fallback to traditional single-shot generation with retries
     configurable = Configuration.from_runnable_config(config)
@@ -1168,7 +1166,7 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
                     timeout=120.0  # 2 minute timeout
                 )
             except asyncio.TimeoutError:
-                print("WARNING: Traditional report generation timed out locally, generating fallback report")
+                logger.warning(" Traditional report generation timed out locally, generating fallback report")
                 # Generate a fallback structured report from the findings
                 fallback_report = generate_fallback_report(
                     state.get("research_brief", ""), 
@@ -1184,9 +1182,9 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
             }
             
         except Exception as e:
-            print(f"ERROR: Final report generation failed: {type(e).__name__}: {str(e)}")
+            logger.error(f" Final report generation failed: {type(e).__name__}: {str(e)}")
             import traceback
-            print(f"ERROR: Full traceback:\n{traceback.format_exc()}")
+            logger.error(f" Full traceback:\n{traceback.format_exc()}")
             
             # Handle API timeout errors specifically
             error_str = str(e).lower()
@@ -1200,7 +1198,7 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
             )
             
             if is_timeout_error:
-                print("WARNING: API timeout detected, generating fallback report")
+                logger.warning(" API timeout detected, generating fallback report")
                 fallback_report = generate_fallback_report(
                     state.get("research_brief", ""), 
                     findings
@@ -1213,13 +1211,13 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
             
             # Handle token limit exceeded errors with progressive truncation
             if is_token_limit_exceeded(e, configurable.final_report_model):
-                print(f"INFO: Token limit exceeded, attempting retry {current_retry + 1}/{max_retries}")
+                logger.info(f" Token limit exceeded, attempting retry {current_retry + 1}/{max_retries}")
                 current_retry += 1
                 
                 if current_retry == 1:
                     # First retry: determine initial truncation limit
                     model_token_limit = get_model_token_limit(configurable.final_report_model)
-                    print(f"INFO: Model token limit: {model_token_limit}")
+                    logger.info(f" Model token limit: {model_token_limit}")
                     if not model_token_limit:
                         return {
                             "final_report": f"Error generating final report: Token limit exceeded, however, we could not determine the model's maximum context length. Please update the model map in deep_researcher/utils.py with this information. {e}",
@@ -1228,19 +1226,19 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
                         }
                     # Use 4x token limit as character approximation for truncation
                     findings_token_limit = model_token_limit * 4
-                    print(f"INFO: Setting initial findings limit to {findings_token_limit} characters")
+                    logger.info(f" Setting initial findings limit to {findings_token_limit} characters")
                 else:
                     # Subsequent retries: reduce by 10% each time
                     findings_token_limit = int(findings_token_limit * 0.9)
-                    print(f"INFO: Reducing findings limit to {findings_token_limit} characters")
+                    logger.info(f" Reducing findings limit to {findings_token_limit} characters")
                 
                 # Truncate findings and retry
                 findings = findings[:findings_token_limit]
-                print(f"INFO: Truncated findings to {len(findings)} characters, retrying...")
+                logger.info(f" Truncated findings to {len(findings)} characters, retrying...")
                 continue
             else:
                 # Non-token-limit error: return error immediately
-                print(f"ERROR: Non-token-limit error in final report generation, failing immediately")
+                logger.error(f" Non-token-limit error in final report generation, failing immediately")
                 return {
                     "final_report": f"Error generating final report: {type(e).__name__}: {str(e)}",
                     "messages": [AIMessage(content=f"Report generation failed: {type(e).__name__}: {str(e)}")],
@@ -1248,7 +1246,7 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
                 }
     
     # Step 4: Return failure result if all retries exhausted
-    print(f"ERROR: Final report generation failed after {max_retries} retries")
+    logger.error(f" Final report generation failed after {max_retries} retries")
     return {
         "final_report": f"Error generating final report: Maximum retries ({max_retries}) exceeded due to token limits",
         "messages": [AIMessage(content=f"Report generation failed after {max_retries} retries due to token limits")],
