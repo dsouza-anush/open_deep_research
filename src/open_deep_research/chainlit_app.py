@@ -20,19 +20,21 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================
-# AUTO-LOGIN (enables sidebar without login form)
+# AUTHENTICATION (enables sidebar/chat history)
 # ============================================
-@cl.header_auth_callback
-def header_auth_callback(headers: dict) -> cl.User | None:
-    """Auto-authenticate all users as 'demo' user.
+@cl.password_auth_callback
+def password_auth_callback(username: str, password: str) -> cl.User | None:
+    """Accept any credentials for demo access.
 
-    This enables sidebar/chat history without requiring a login form.
-    Every visitor is automatically logged in as 'demo'.
+    Enter any username/password (e.g., demo/demo) to access.
+    This enables sidebar and chat history features.
     """
-    return cl.User(
-        identifier="demo",
-        metadata={"role": "demo", "provider": "header"}
-    )
+    if username:  # Accept any non-empty username
+        return cl.User(
+            identifier=username,
+            metadata={"role": "demo", "provider": "credentials"}
+        )
+    return None
 @cl.on_chat_start
 async def start():
     """Initialize session with configuration."""
