@@ -54,23 +54,83 @@ from open_deep_research.utils import (
 
 
 def ensure_message_content_validity(messages):
-    """Ensure all AI messages have valid content for API compatibility.
-    
-    This function validates that all AI messages have non-empty content,
-    adding default content when necessary to satisfy OpenAI API requirements.
-    
+    """Ensure all messages have valid content for OpenAI API compatibility.
+
+    The OpenAI API (and Heroku Inference API) requires that ALL messages have
+    non-empty content, including AI messages with tool calls. LangChain often
+    creates AIMessage objects with content=None when tool calls are present,
+    which causes API validation errors.
+
+    This function creates new message objects with valid content instead of
+    modifying in-place, which may not work with immutable dataclass objects.
+
     Args:
         messages: List of message objects to validate
-        
+
     Returns:
-        List of validated messages with proper content
+        List of new message objects with valid content
     """
+    validated = []
     for message in messages:
-        # Check if message has empty or None content
-        if hasattr(message, 'content') and (not message.content or message.content is None):
-            # Add default content for empty messages to satisfy API requirements
-            message.content = "Processing request."
-    return messages
+        # Check if message needs content fix
+        needs_fix = (
+            hasattr(message, 'content') and
+            (message.content is None or message.content == "" or
+             (isinstance(message.content, str) and not message.content.strip()))
+        )
+
+        if needs_fix:
+            # Create a new message with valid content based on type
+            if isinstance(message, AIMessage):
+                # For AI messages with tool calls, add descriptive content
+                if hasattr(message, 'tool_calls') and message.tool_calls:
+                    tool_names = [tc.get('name', 'tool') for tc in message.tool_calls]
+                    new_content = f"Executing: {', '.join(tool_names)}"
+                else:
+                    new_content = "Processing request."
+
+                # Create new AIMessage with all original attributes plus valid content
+                new_message = AIMessage(
+                    content=new_content,
+                    additional_kwargs=getattr(message, 'additional_kwargs', {}),
+                    response_metadata=getattr(message, 'response_metadata', {}),
+                    tool_calls=getattr(message, 'tool_calls', []),
+                    invalid_tool_calls=getattr(message, 'invalid_tool_calls', []),
+                    id=getattr(message, 'id', None),
+                )
+                validated.append(new_message)
+            elif isinstance(message, HumanMessage):
+                new_message = HumanMessage(
+                    content="[User input]",
+                    additional_kwargs=getattr(message, 'additional_kwargs', {}),
+                )
+                validated.append(new_message)
+            elif isinstance(message, SystemMessage):
+                new_message = SystemMessage(
+                    content="System message.",
+                    additional_kwargs=getattr(message, 'additional_kwargs', {}),
+                )
+                validated.append(new_message)
+            elif isinstance(message, ToolMessage):
+                new_message = ToolMessage(
+                    content="Tool executed.",
+                    name=getattr(message, 'name', 'tool'),
+                    tool_call_id=getattr(message, 'tool_call_id', ''),
+                    additional_kwargs=getattr(message, 'additional_kwargs', {}),
+                )
+                validated.append(new_message)
+            else:
+                # For unknown message types, try to set content directly as fallback
+                try:
+                    message.content = "Processing."
+                    validated.append(message)
+                except (AttributeError, TypeError):
+                    validated.append(message)
+        else:
+            # Message has valid content, keep as-is
+            validated.append(message)
+
+    return validated
 
 # Initialize a configurable model that we will use throughout the agent
 configurable_model = init_chat_model(
