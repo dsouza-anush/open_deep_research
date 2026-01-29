@@ -1,7 +1,6 @@
 """Chainlit UI for Open Deep Research with full UI affordances.
 
 Features:
-- Authentication (enables sidebar/chat history)
 - Tool call visualization via LangchainCallbackHandler
 - Research progress Steps
 - Document Elements for reports
@@ -18,29 +17,6 @@ from open_deep_research.configuration import Configuration
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-# ============================================
-# AUTHENTICATION (enables sidebar/chat history)
-# ============================================
-@cl.password_auth_callback
-def auth_callback(username: str, password: str):
-    """Simple password authentication for sidebar access.
-
-    Accepts any non-empty username/password combination.
-    In production, validate against a user database.
-    """
-    if username and password:
-        return cl.User(
-            identifier=username,
-            metadata={"role": "user", "provider": "credentials"}
-        )
-    return None
-
-
-# ============================================
-# CHAT LIFECYCLE
-# ============================================
 @cl.on_chat_start
 async def start():
     """Initialize session with configuration."""
