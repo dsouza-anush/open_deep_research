@@ -1,9 +1,9 @@
-"""Chainlit UI for Open Deep Research with full UI affordances.
+"""Chainlit UI for Open Deep Research.
 
 Features:
-- Auto-login for demo (enables sidebar/chat history without login form)
 - Tool call visualization via LangchainCallbackHandler
 - Document Elements for reports
+- No authentication required (demo mode)
 """
 
 import logging
@@ -19,22 +19,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# ============================================
-# AUTHENTICATION (enables sidebar/chat history)
-# ============================================
-@cl.password_auth_callback
-def password_auth_callback(username: str, password: str) -> cl.User | None:
-    """Accept any credentials for demo access.
-
-    Enter any username/password (e.g., demo/demo) to access.
-    This enables sidebar and chat history features.
-    """
-    if username:  # Accept any non-empty username
-        return cl.User(
-            identifier=username,
-            metadata={"role": "demo", "provider": "credentials"}
-        )
-    return None
 @cl.on_chat_start
 async def start():
     """Initialize session with configuration."""
