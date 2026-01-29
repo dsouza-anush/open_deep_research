@@ -5,22 +5,31 @@ allow_origins = ["*"]
 # Session timeout in seconds
 session_timeout = 3600
 
+# Enable caching
+cache = false
+
 [features]
 # Disable prompt playground for cleaner UI
 prompt_playground = false
+
+# Enable multi-modal (file uploads)
+multi_modal = true
 
 [UI]
 # App name shown in header
 name = "Heroku Deep Research"
 
-# Logo shown in header
-logo_file_url = "/public/logo.svg"
-
-# Default to dark theme
+# Default theme
 default_theme = "dark"
 
-# Show tool calls in chain of thought
+# Chain of thought display mode
 cot = "tool_call"
 
-# Hide default collapse for better UX
+# Don't collapse content by default
 default_collapse_content = false
+
+# Don't show readme as default
+show_readme_as_default = false
+
+[meta]
+generated_by = "1.0.0"
