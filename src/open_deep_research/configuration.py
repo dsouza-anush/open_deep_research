@@ -262,11 +262,13 @@ class Configuration(BaseModel):
             # Auto-select search API based on available credentials
             # Only override if not explicitly set in config
             if not configurable.get("search_api"):
-                # Check for Bright Data API key (supports both naming conventions)
-                if os.getenv("BRIGHTDATA_API_KEY") or os.getenv("BRIGHT_DATA_API_KEY"):
-                    values["search_api"] = SearchAPI.BRIGHTDATA
-                elif os.getenv("TAVILY_API_KEY"):
+                # Prefer Tavily over Bright Data as it has better general web search support
+                # Note: langchain_brightdata now only supports structured datasets (amazon, linkedin, etc)
+                # not generic web scraping
+                if os.getenv("TAVILY_API_KEY"):
                     values["search_api"] = SearchAPI.TAVILY
+                elif os.getenv("BRIGHTDATA_API_KEY") or os.getenv("BRIGHT_DATA_API_KEY"):
+                    values["search_api"] = SearchAPI.BRIGHTDATA
                 else:
                     # No search API available - model will use its knowledge only
                     # Anthropic/OpenAI native search requires direct API access, not compatible
