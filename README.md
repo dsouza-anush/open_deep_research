@@ -82,20 +82,22 @@ This repository serves as a **complete reference implementation** for deploying 
 
 ### Architecture
 
-- **Backend**: Python + FastAPI + LangGraph
-- **Frontend**: Server-side rendered HTML with modern JavaScript
+- **Backend**: Python + LangGraph + LangChain
+- **Frontend**: Chainlit conversational UI with real-time research progress
 - **AI Model**: Claude 4 Sonnet via Heroku Inference API
+- **Search**: Tavily or Bright Data for web search
 - **Database**: None required (stateless design)
-- **Deployment**: Single-app architecture with Python templating
+- **Deployment**: Single-app architecture with Chainlit
 
 ### Key Files for Heroku Deployment
 
 - **`app.json`** - Heroku Button configuration with addons and environment variables
-- **`Procfile`** - Web server process definition (`uvicorn src.open_deep_research.server:app`)
+- **`Procfile`** - Web server process definition (`chainlit run`)
 - **`runtime.txt`** - Python version specification
 - **`requirements.txt`** - Python dependencies (generated from pyproject.toml)
-- **`src/open_deep_research/server.py`** - FastAPI application with web UI
-- **`src/open_deep_research/templates/`** - HTML templates with dark modern UI
+- **`src/open_deep_research/chainlit_app.py`** - Chainlit UI with research progress visualization
+- **`src/open_deep_research/server.py`** - REST API for programmatic access
+- **`.chainlit/config.toml`** - Chainlit UI configuration
 
 ### Heroku-Specific Adaptations
 
@@ -201,18 +203,30 @@ You can also deploy your own instance of OAP, and make your own custom agents (l
 1. [Deploy Open Agent Platform](https://docs.oap.langchain.com/quickstart)
 2. [Add Deep Researcher to OAP](https://docs.oap.langchain.com/setup/agents)
 
-### Legacy Implementations 🏛️
+### Chainlit UI Features
 
-The `src/legacy/` folder contains two earlier implementations that provide alternative approaches to automated research. They are less performant than the current implementation, but provide alternative ideas understanding the different approaches to deep research.
+The web interface is built with [Chainlit](https://chainlit.io/) and includes:
 
-#### 1. Workflow Implementation (`legacy/graph.py`)
-- **Plan-and-Execute**: Structured workflow with human-in-the-loop planning
-- **Sequential Processing**: Creates sections one by one with reflection
-- **Interactive Control**: Allows feedback and approval of report plans
-- **Quality Focused**: Emphasizes accuracy through iterative refinement
+- **Starter Prompts**: Quick-start research topics on the welcome screen
+- **Research Settings**: Configurable depth, parallel researchers, and search provider
+- **Progress Visualization**: Real-time animated progress during research
+- **Tool Call Display**: See each research step as it executes
+- **Document Elements**: Full research reports with side panel viewing
+- **Dark Theme**: Modern dark UI optimized for readability
 
-#### 2. Multi-Agent Implementation (`legacy/multi_agent.py`)  
-- **Supervisor-Researcher Architecture**: Coordinated multi-agent system
-- **Parallel Processing**: Multiple researchers work simultaneously
-- **Speed Optimized**: Faster report generation through concurrency
-- **MCP Support**: Extensive Model Context Protocol integration
+### REST API
+
+For programmatic access, use the FastAPI server at `/api`:
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Start research (async)
+curl -X POST http://localhost:8000/research/async \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What are the latest AI breakthroughs?"}'
+
+# Check job status
+curl http://localhost:8000/research/status/{job_id}
+```

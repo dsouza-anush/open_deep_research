@@ -1,17 +1,19 @@
-"""FastAPI server for deploying Deep Research agent to Heroku."""
+"""FastAPI API server for Deep Research agent.
+
+This provides a REST API for programmatic access to the research agent.
+For the web UI, use the Chainlit app (chainlit_app.py).
+"""
 
 import asyncio
 import logging
 import os
 import time
 import uuid
-from pathlib import Path
 from typing import Dict, Optional
 
-from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from open_deep_research.deep_researcher import deep_researcher
@@ -23,13 +25,9 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Open Deep Research API",
-    description="Deep research agent with automated report generation",
-    version="0.0.16"
+    description="REST API for deep research agent. For web UI, use the Chainlit interface.",
+    version="0.0.17"
 )
-
-# Setup templates
-templates_dir = Path(__file__).parent / "templates"
-templates = Jinja2Templates(directory=str(templates_dir))
 
 # Add CORS middleware with configurable origins
 allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
@@ -142,10 +140,10 @@ async def run_research_background_async(job_id: str, query: str, config_dict: Di
             jobs_storage[job_id]["progress"] = f"Research failed: {str(e)}"
             jobs_storage[job_id]["updated_at"] = time.time()
 
-@app.get("/", response_class=HTMLResponse)
-async def root(request: Request):
-    """Serve the web interface."""
-    return templates.TemplateResponse("index.html", {"request": request})
+@app.get("/")
+async def root():
+    """Redirect to API documentation."""
+    return RedirectResponse(url="/docs")
 
 @app.get("/health")
 async def health():

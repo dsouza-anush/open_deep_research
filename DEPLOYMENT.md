@@ -39,7 +39,7 @@ Use the Heroku Button for one-click deployment:
 
 **`Procfile`**:
 ```
-web: uvicorn src.your_app.server:app --host 0.0.0.0 --port $PORT
+web: chainlit run src/open_deep_research/chainlit_app.py --host 0.0.0.0 --port $PORT
 ```
 
 **`runtime.txt`**:

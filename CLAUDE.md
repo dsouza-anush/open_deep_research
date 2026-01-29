@@ -1,66 +1,60 @@
-# Open Deep Research Repository Overview
+# Open Deep Research - Heroku Reference App
 
 ## Project Description
-Open Deep Research is a configurable, fully open-source deep research agent that works across multiple model providers, search tools, and MCP (Model Context Protocol) servers. It enables automated research with parallel processing and comprehensive report generation.
+Open Deep Research is a configurable deep research agent deployed on Heroku with a Chainlit UI. It uses Claude 4 Sonnet via Heroku Inference API for AI-powered research.
 
 ## Repository Structure
 
 ### Root Directory
-- `README.md` - Comprehensive project documentation with quickstart guide
-- `pyproject.toml` - Python project configuration and dependencies
-- `langgraph.json` - LangGraph configuration defining the main graph entry point
-- `uv.lock` - UV package manager lock file
-- `LICENSE` - MIT license
-- `.env.example` - Environment variables template (not tracked)
+- `README.md` - Project documentation with deployment guide
+- `pyproject.toml` - Python dependencies
+- `langgraph.json` - LangGraph configuration
+- `Procfile` - Heroku process definition (runs Chainlit)
+- `app.json` - Heroku Button deployment config
+- `requirements.txt` - Pip dependencies for Heroku
+- `runtime.txt` - Python version for Heroku
 
-### Core Implementation (`src/open_deep_research/`)
-- `deep_researcher.py` - Main LangGraph implementation (entry point: `deep_researcher`)
-- `configuration.py` - Configuration management and settings
-- `state.py` - Graph state definitions and data structures  
-- `prompts.py` - System prompts and prompt templates
-- `utils.py` - Utility functions and helpers
-- `files/` - Research output and example files
+### Chainlit UI (`src/open_deep_research/`)
+- `chainlit_app.py` - Main Chainlit UI with starters, settings, progress visualization
+- `.chainlit/config.toml` - Chainlit configuration (theme, branding)
+- `chainlit.md` - Welcome message content
+- `public/` - UI assets (icons for starter buttons, logo)
 
-### Legacy Implementations (`src/legacy/`)
-Contains two earlier research implementations:
-- `graph.py` - Plan-and-execute workflow with human-in-the-loop
-- `multi_agent.py` - Supervisor-researcher multi-agent architecture
-- `legacy.md` - Documentation for legacy implementations
-- `CLAUDE.md` - Legacy-specific Claude instructions
-- `tests/` - Legacy-specific tests
+### Core Research Engine
+- `deep_researcher.py` - LangGraph research workflow
+- `configuration.py` - Configuration management
+- `state.py` - Graph state definitions
+- `prompts.py` - System prompts
+- `utils.py` - Utility functions
 
-### Security (`src/security/`)
-- `auth.py` - Authentication handler for LangGraph deployment
+### API Server
+- `server.py` - FastAPI REST API for programmatic access
 
 ### Testing (`tests/`)
-- `run_evaluate.py` - Main evaluation script configured to run on deep research bench
-- `evaluators.py` - Specialized evaluation functions  
-- `prompts.py` - Evaluation prompts and criteria
-- `pairwise_evaluation.py` - Comparative evaluation tools
-- `supervisor_parallel_evaluation.py` - Multi-threaded evaluation
-
-### Examples (`examples/`)
-- `arxiv.md` - ArXiv research example
-- `pubmed.md` - PubMed research example
-- `inference-market.md` - Inference market analysis examples
+- `run_evaluate.py` - Evaluation script for Deep Research Bench
+- `evaluators.py` - Evaluation functions
 
 ## Key Technologies
-- **LangGraph** - Workflow orchestration and graph execution
-- **LangChain** - LLM integration and tool calling
-- **Multiple LLM Providers** - OpenAI, Anthropic, Google, Groq, DeepSeek support
-- **Search APIs** - Tavily, OpenAI/Anthropic native search, DuckDuckGo, Exa
-- **MCP Servers** - Model Context Protocol for extended capabilities
+- **Chainlit** - Conversational UI framework
+- **LangGraph** - Research workflow orchestration
+- **LangChain** - LLM integration
+- **Heroku Inference API** - Claude 4 Sonnet access
+- **Tavily/Bright Data** - Web search APIs
 
 ## Development Commands
-- `uvx langgraph dev` - Start development server with LangGraph Studio
-- `python tests/run_evaluate.py` - Run comprehensive evaluations
-- `ruff check` - Code linting
-- `mypy` - Type checking
+```bash
+# Local development with Chainlit
+chainlit run src/open_deep_research/chainlit_app.py -w
 
-## Configuration
-All settings configurable via:
-- Environment variables (`.env` file)
-- Web UI in LangGraph Studio
-- Direct configuration modification
+# LangGraph Studio
+uvx langgraph dev
 
-Key settings include model selection, search API choice, concurrency limits, and MCP server configurations.
+# Run API server only
+uvicorn src.open_deep_research.server:app --reload
+```
+
+## Heroku Deployment
+The app deploys via Heroku Button with:
+- `INFERENCE_KEY` - Heroku Inference API key (auto-provisioned)
+- `INFERENCE_URL` - API endpoint (auto-provisioned)
+- `TAVILY_API_KEY` - Web search API key (optional)
