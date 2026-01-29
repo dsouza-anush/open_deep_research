@@ -1,13 +1,14 @@
-"""Chainlit UI for Open Deep Research.
+"""Chainlit UI for Heroku Deep Research.
 
 Features:
 - Starters: Quick research query examples on welcome screen
 - Chat Settings: Configure research depth and iterations
+- Animated progress indicator during research
 - Tool call visualization via LangchainCallbackHandler
 - Document Elements for research reports
-- Progress feedback during long-running research
 """
 
+import asyncio
 import logging
 
 import chainlit as cl
@@ -20,6 +21,16 @@ from open_deep_research.configuration import Configuration, SearchAPI
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Loading animation frames
+LOADING_FRAMES = ["◐", "◓", "◑", "◒"]
+RESEARCH_PHASES = [
+    "Planning research strategy",
+    "Searching for sources",
+    "Analyzing documents",
+    "Synthesizing findings",
+    "Writing report",
+]
 
 
 # ============================================
@@ -61,6 +72,12 @@ async def start():
     config = Configuration.from_runnable_config({})
     cl.user_session.set("config", config)
 
+    # Set custom avatar for assistant
+    await cl.Avatar(
+        name="Heroku Deep Research",
+        url="/public/logo.svg",
+    ).send()
+
     # Create settings panel
     settings = await cl.ChatSettings(
         [
@@ -101,25 +118,6 @@ async def start():
     # Apply any immediate settings
     await apply_settings(settings)
 
-    # Send welcome message
-    await cl.Message(
-        content="""**Welcome to Deep Research!**
-
-I'm an AI research assistant that conducts thorough, multi-source research on any topic.
-
-**How it works:**
-1. Enter your research question or click a starter above
-2. I'll search the web, analyze sources, and synthesize findings
-3. You'll receive a comprehensive research report
-
-**Tips:**
-- Be specific about what you want to learn
-- Adjust settings (gear icon) for research depth
-- Complex topics may need higher iteration counts
-
-*Ready when you are!*"""
-    ).send()
-
     logger.info(f"Session started: model={config.research_model}, search={config.search_api}")
 
 
@@ -148,8 +146,30 @@ async def settings_update(settings: dict):
     """Handle settings updates from the UI."""
     await apply_settings(settings)
     await cl.Message(
-        content=f"Settings updated! Research depth: {settings.get('max_iterations', 3)} iterations"
+        content=f"⚙️ Settings updated! Research depth: {settings.get('max_iterations', 3)} iterations"
     ).send()
+
+
+# ============================================
+# ANIMATED LOADING INDICATOR
+# ============================================
+async def animate_loading(status_msg: cl.Message, stop_event: asyncio.Event):
+    """Animate loading indicator while research runs."""
+    frame_idx = 0
+    phase_idx = 0
+
+    while not stop_event.is_set():
+        frame = LOADING_FRAMES[frame_idx % len(LOADING_FRAMES)]
+        phase = RESEARCH_PHASES[phase_idx % len(RESEARCH_PHASES)]
+
+        status_msg.content = f"{frame} **{phase}...**"
+        await status_msg.update()
+
+        frame_idx += 1
+        if frame_idx % 8 == 0:  # Change phase every 8 frames (~4 seconds)
+            phase_idx += 1
+
+        await asyncio.sleep(0.5)
 
 
 # ============================================
@@ -157,25 +177,38 @@ async def settings_update(settings: dict):
 # ============================================
 @cl.on_message
 async def main(message: cl.Message):
-    """Handle research requests with progress feedback."""
+    """Handle research requests with animated progress feedback."""
     config = cl.user_session.get("config")
 
-    # Send initial feedback
-    status_msg = cl.Message(content="Starting research... This may take a few minutes.")
+    # Create status message with loading animation
+    status_msg = cl.Message(content="◐ **Starting research...**")
     await status_msg.send()
+
+    # Start loading animation in background
+    stop_animation = asyncio.Event()
+    animation_task = asyncio.create_task(animate_loading(status_msg, stop_animation))
 
     # LangChain callback handler auto-creates steps for all LangGraph operations
     cb = cl.LangchainCallbackHandler()
 
     try:
-        # Run research
-        result = await deep_researcher.ainvoke(
-            {"messages": [{"role": "user", "content": message.content}]},
-            config=RunnableConfig(
-                callbacks=[cb],
-                configurable=config.model_dump()
+        # Run research with step visualization
+        async with cl.Step(name="Deep Research", type="run") as research_step:
+            research_step.input = message.content
+
+            result = await deep_researcher.ainvoke(
+                {"messages": [{"role": "user", "content": message.content}]},
+                config=RunnableConfig(
+                    callbacks=[cb],
+                    configurable=config.model_dump()
+                )
             )
-        )
+
+            research_step.output = "Research completed"
+
+        # Stop animation
+        stop_animation.set()
+        await animation_task
 
         # Remove status message
         await status_msg.remove()
@@ -191,7 +224,7 @@ async def main(message: cl.Message):
         if report:
             # Create document element for full report (opens in side panel)
             report_element = cl.Text(
-                name="Full Research Report",
+                name="📄 Full Research Report",
                 content=report,
                 display="side"
             )
@@ -205,15 +238,19 @@ async def main(message: cl.Message):
             logger.info("Research completed successfully")
         else:
             await cl.Message(
-                content="Research completed but no report was generated. Please try again with a different query."
+                content="⚠️ Research completed but no report was generated. Please try again with a different query."
             ).send()
             logger.warning("Research completed but no report generated")
 
     except Exception as e:
-        # Remove status message on error
+        # Stop animation on error
+        stop_animation.set()
+        await animation_task
+
+        # Remove status message
         await status_msg.remove()
 
         logger.error(f"Research failed: {e}")
         await cl.Message(
-            content=f"**Research failed:** {e}\n\nPlease try again or rephrase your query."
+            content=f"❌ **Research failed:** {e}\n\nPlease try again or rephrase your query."
         ).send()

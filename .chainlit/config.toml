@@ -28,8 +28,8 @@ cot = "tool_call"
 # Don't collapse content by default
 default_collapse_content = false
 
-# Don't show readme as default
-show_readme_as_default = false
+# Show welcome message (chainlit.md) on start
+show_readme_as_default = true
 
 [meta]
 generated_by = "1.0.0"
