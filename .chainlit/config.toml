@@ -1,0 +1,26 @@
+[project]
+# Allow all origins for demo
+allow_origins = ["*"]
+
+# Session timeout in seconds
+session_timeout = 3600
+
+[features]
+# Disable prompt playground for cleaner UI
+prompt_playground = false
+
+[UI]
+# App name shown in header
+name = "Heroku Deep Research"
+
+# Logo shown in header
+logo_file_url = "/public/logo.svg"
+
+# Default to dark theme
+default_theme = "dark"
+
+# Show tool calls in chain of thought
+cot = "tool_call"
+
+# Hide default collapse for better UX
+default_collapse_content = false

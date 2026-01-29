@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 40" width="200" height="40">
+  <defs>
+    <linearGradient id="herokuGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#79589f"/>
+      <stop offset="100%" style="stop-color:#6762a6"/>
+    </linearGradient>
+  </defs>
+  <!-- Heroku-style icon -->
+  <rect x="2" y="4" width="24" height="32" rx="3" fill="url(#herokuGradient)"/>
+  <path d="M8 12 L8 20 L14 16 Z" fill="white"/>
+  <path d="M18 12 L18 28" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <!-- Text -->
+  <text x="34" y="27" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="600" fill="currentColor">
+    Deep Research
+  </text>
+</svg>
