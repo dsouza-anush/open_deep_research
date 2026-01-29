@@ -624,7 +624,9 @@ async def researcher(state: ResearcherState, config: RunnableConfig) -> Command[
     
     # Step 3: Generate researcher response with system context
     messages = [SystemMessage(content=researcher_prompt)] + researcher_messages
-    response = await research_model.ainvoke(messages)
+    # Validate messages before sending to API to prevent content validation errors
+    validated_messages = ensure_message_content_validity(messages)
+    response = await research_model.ainvoke(validated_messages)
     
     # Step 4: Update state and proceed to tool execution
     return Command(
@@ -758,9 +760,11 @@ async def compress_research(state: ResearcherState, config: RunnableConfig):
             # Create system prompt focused on compression task
             compression_prompt = compress_research_system_prompt.format(date=get_today_str())
             messages = [SystemMessage(content=compression_prompt)] + researcher_messages
-            
+            # Validate messages before sending to API to prevent content validation errors
+            validated_messages = ensure_message_content_validity(messages)
+
             # Execute compression
-            response = await synthesizer_model.ainvoke(messages)
+            response = await synthesizer_model.ainvoke(validated_messages)
             
             # Extract raw notes from all tool and AI messages
             raw_notes_content = "\n".join([
