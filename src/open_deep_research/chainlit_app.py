@@ -174,6 +174,11 @@ async def main(message: cl.Message):
     """Handle research requests with animated progress feedback."""
     config = cl.user_session.get("config")
 
+    # Ensure config exists (may be None if session wasn't initialized)
+    if config is None:
+        config = Configuration.from_runnable_config({})
+        cl.user_session.set("config", config)
+
     # Create status message with loading animation
     status_msg = cl.Message(content="◐ **Starting research...**")
     await status_msg.send()
