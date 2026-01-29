@@ -5,9 +5,6 @@ name = "Open Deep Research"
 # Disable telemetry
 enable_telemetry = false
 
-# Enable automatic markdown rendering
-markdown = true
-
 [UI]
 # Chatbot name
 name = "Deep Research"
@@ -21,34 +18,9 @@ default_theme = "dark"
 # Show readme as default element
 show_readme_as_default = false
 
-# Collapse default elements
-default_collapse_content = false
-
-# Custom CSS (optional)
-# custom_css = "/public/custom.css"
-
-[UI.theme]
-# Primary color for buttons and accents
-primary_color = "#1f6feb"
-
-# Background colors
-background_color = "#0d1117"
-paper_background_color = "#161b22"
-
 [features]
 # Enable/disable features
 streaming = true
+latex = true
 prompt_playground = false
 multi_modal = false
-
-[features.audio]
-# Audio features
-enabled = false
-
-[features.latex]
-# LaTeX rendering
-enabled = true
-
-[meta]
-# Metadata for SEO
-generated_by = "Chainlit"
