@@ -1,0 +1,13 @@
+[project]
+enable_telemetry = false
+
+[features]
+prompt_playground = false
+multi_modal = false
+
+[UI]
+name = "Deep Research"
+show_readme_as_default = false
+cot = "tool_call"
+default_collapse_content = false
+hide_cot = false

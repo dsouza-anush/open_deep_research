@@ -1,13 +1,16 @@
-"""Chainlit UI for Open Deep Research.
+"""Chainlit UI for Open Deep Research with full UI affordances.
 
-This provides a premium chat interface for the deep research agent,
-with streaming support and beautiful markdown rendering.
+Features:
+- Authentication (enables sidebar/chat history)
+- Tool call visualization via LangchainCallbackHandler
+- Research progress Steps
+- Document Elements for reports
 """
 
 import logging
-import os
 
 import chainlit as cl
+from langchain_core.runnables import RunnableConfig
 
 from open_deep_research.deep_researcher import deep_researcher
 from open_deep_research.configuration import Configuration
@@ -17,73 +20,98 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+# ============================================
+# AUTHENTICATION (enables sidebar/chat history)
+# ============================================
+@cl.password_auth_callback
+def auth_callback(username: str, password: str):
+    """Simple password authentication for sidebar access.
+
+    Accepts any non-empty username/password combination.
+    In production, validate against a user database.
+    """
+    if username and password:
+        return cl.User(
+            identifier=username,
+            metadata={"role": "user", "provider": "credentials"}
+        )
+    return None
+
+
+# ============================================
+# CHAT LIFECYCLE
+# ============================================
 @cl.on_chat_start
 async def start():
     """Initialize session with configuration."""
-    # Use from_runnable_config to apply Heroku-specific settings (model, search API)
     config = Configuration.from_runnable_config({})
     cl.user_session.set("config", config)
-    logger.info(f"Session config: model={config.research_model}, search={config.search_api}")
-
-    # Welcome message - simple and clean
-    await cl.Message(
-        content="Welcome to Deep Research. Ask me anything."
-    ).send()
+    logger.info(f"Session started: model={config.research_model}, search={config.search_api}")
 
 
 @cl.on_message
 async def main(message: cl.Message):
-    """Handle incoming messages and run research."""
+    """Handle research requests with full UI visualization."""
     config = cl.user_session.get("config")
 
-    # Create a message to stream updates
-    msg = cl.Message(content="")
-    await msg.send()
+    # LangChain callback handler for automatic tool step visualization
+    cb = cl.LangchainCallbackHandler()
 
-    # Update with initial status
-    msg.content = "🔍 **Starting research...**\n\nAnalyzing your query and planning research strategy..."
-    await msg.update()
+    # Parent step wraps entire research process
+    async with cl.Step(name="Deep Research", type="run") as parent_step:
+        parent_step.input = message.content
 
-    try:
-        # Run the deep research workflow
-        logger.info(f"Starting research for query: {message.content[:100]}...")
+        try:
+            # Run research with callback handler for tool visualization
+            result = await deep_researcher.ainvoke(
+                {"messages": [{"role": "user", "content": message.content}]},
+                config=RunnableConfig(
+                    callbacks=[cb],
+                    configurable=config.model_dump()
+                )
+            )
 
-        result = await deep_researcher.ainvoke(
-            {"messages": [{"role": "user", "content": message.content}]},
-            config={"configurable": config.model_dump()}
-        )
+            # Extract report from result messages
+            report = None
+            if result and "messages" in result:
+                for m in reversed(result["messages"]):
+                    if hasattr(m, "content") and m.content:
+                        report = m.content
+                        break
 
-        # Extract the final report
-        report = None
-        if result and "messages" in result:
-            for m in reversed(result["messages"]):
-                if hasattr(m, "content") and m.content:
-                    report = m.content
-                    break
+            if report:
+                parent_step.output = "Research completed"
 
-        if report:
-            msg.content = report
-            logger.info("Research completed successfully")
-        else:
-            msg.content = "⚠️ Research completed but no report was generated. Please try again."
-            logger.warning("Research completed but no report generated")
+                # Create document element for full report (clickable in sidebar)
+                report_element = cl.Text(
+                    name="Full Research Report",
+                    content=report,
+                    display="side"
+                )
 
-        await msg.update()
+                # Send the full report with element attachment
+                await cl.Message(
+                    content=report,
+                    elements=[report_element]
+                ).send()
 
-    except Exception as e:
-        logger.error(f"Research failed: {str(e)}")
-        msg.content = f"❌ **Error during research**\n\n```\n{str(e)}\n```\n\nPlease try again or rephrase your query."
-        await msg.update()
+                logger.info("Research completed successfully")
+            else:
+                parent_step.output = "No report generated"
+                await cl.Message(
+                    content="Research completed but no report was generated. Please try again."
+                ).send()
+                logger.warning("Research completed but no report generated")
+
+        except Exception as e:
+            logger.error(f"Research failed: {e}")
+            parent_step.output = f"Error: {e}"
+            await cl.Message(
+                content=f"Research failed: {e}\n\nPlease try again or rephrase your query."
+            ).send()
 
 
 @cl.on_settings_update
 async def settings_update(settings):
     """Handle settings updates from the UI."""
     logger.info(f"Settings updated: {settings}")
-
-
-# Optional: Add step visualization for research progress
-@cl.step(type="tool")
-async def research_step(name: str, description: str):
-    """Visualize a research step in the UI."""
-    return f"Completed: {name}"
