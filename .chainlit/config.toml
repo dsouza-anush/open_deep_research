@@ -22,6 +22,9 @@ name = "Heroku Deep Research"
 # Default theme
 default_theme = "dark"
 
+# Custom CSS for purple theming
+custom_css = "/public/custom.css"
+
 # Chain of thought display mode
 cot = "tool_call"
 

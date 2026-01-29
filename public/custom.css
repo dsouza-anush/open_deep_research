@@ -1,0 +1,52 @@
+/* Custom theme for Heroku Deep Research */
+
+/* Make the welcome logo smaller (default is too large) */
+.watermark img,
+[class*="watermark"] img,
+.MuiBox-root > img {
+  max-width: 64px !important;
+  max-height: 64px !important;
+  width: 64px !important;
+  height: 64px !important;
+}
+
+/* Purple send button to match Heroku branding */
+button[type="submit"] {
+  background-color: #79589f !important;
+  color: white !important;
+}
+
+button[type="submit"]:hover {
+  background-color: #6762a6 !important;
+}
+
+/* The circular send button */
+.MuiFab-root,
+.MuiFab-primary,
+[class*="MuiFab"] {
+  background-color: #79589f !important;
+  color: white !important;
+}
+
+.MuiFab-root:hover,
+.MuiFab-primary:hover {
+  background-color: #6762a6 !important;
+}
+
+/* Any primary colored buttons */
+.MuiButton-containedPrimary,
+.MuiIconButton-colorPrimary {
+  background-color: #79589f !important;
+  color: white !important;
+}
+
+.MuiButton-containedPrimary:hover,
+.MuiIconButton-colorPrimary:hover {
+  background-color: #6762a6 !important;
+}
+
+/* Primary color accent override */
+:root {
+  --primary-color: #79589f;
+  --primary-dark: #6762a6;
+}
