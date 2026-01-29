@@ -30,61 +30,53 @@ async def main(message: cl.Message):
     """Handle research requests with full UI visualization."""
     config = cl.user_session.get("config")
 
-    # LangChain callback handler for automatic tool step visualization
+    # LangChain callback handler auto-creates steps for all LangGraph operations
     cb = cl.LangchainCallbackHandler()
 
-    # Parent step wraps entire research process
-    async with cl.Step(name="Deep Research", type="run") as parent_step:
-        parent_step.input = message.content
+    try:
+        # Run research - callback handler shows all tool steps automatically
+        result = await deep_researcher.ainvoke(
+            {"messages": [{"role": "user", "content": message.content}]},
+            config=RunnableConfig(
+                callbacks=[cb],
+                configurable=config.model_dump()
+            )
+        )
 
-        try:
-            # Run research with callback handler for tool visualization
-            result = await deep_researcher.ainvoke(
-                {"messages": [{"role": "user", "content": message.content}]},
-                config=RunnableConfig(
-                    callbacks=[cb],
-                    configurable=config.model_dump()
-                )
+        # Extract report from result messages
+        report = None
+        if result and "messages" in result:
+            for m in reversed(result["messages"]):
+                if hasattr(m, "content") and m.content:
+                    report = m.content
+                    break
+
+        if report:
+            # Create document element for full report
+            report_element = cl.Text(
+                name="Full Research Report",
+                content=report,
+                display="side"
             )
 
-            # Extract report from result messages
-            report = None
-            if result and "messages" in result:
-                for m in reversed(result["messages"]):
-                    if hasattr(m, "content") and m.content:
-                        report = m.content
-                        break
-
-            if report:
-                parent_step.output = "Research completed"
-
-                # Create document element for full report (clickable in sidebar)
-                report_element = cl.Text(
-                    name="Full Research Report",
-                    content=report,
-                    display="side"
-                )
-
-                # Send the full report with element attachment
-                await cl.Message(
-                    content=report,
-                    elements=[report_element]
-                ).send()
-
-                logger.info("Research completed successfully")
-            else:
-                parent_step.output = "No report generated"
-                await cl.Message(
-                    content="Research completed but no report was generated. Please try again."
-                ).send()
-                logger.warning("Research completed but no report generated")
-
-        except Exception as e:
-            logger.error(f"Research failed: {e}")
-            parent_step.output = f"Error: {e}"
+            # Send the report with element attachment
             await cl.Message(
-                content=f"Research failed: {e}\n\nPlease try again or rephrase your query."
+                content=report,
+                elements=[report_element]
             ).send()
+
+            logger.info("Research completed successfully")
+        else:
+            await cl.Message(
+                content="Research completed but no report was generated. Please try again."
+            ).send()
+            logger.warning("Research completed but no report generated")
+
+    except Exception as e:
+        logger.error(f"Research failed: {e}")
+        await cl.Message(
+            content=f"Research failed: {e}\n\nPlease try again or rephrase your query."
+        ).send()
 
 
 @cl.on_settings_update
