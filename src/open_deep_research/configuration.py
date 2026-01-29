@@ -246,17 +246,33 @@ class Configuration(BaseModel):
             field_name: os.environ.get(field_name.upper(), configurable.get(field_name))
             for field_name in field_names
         }
-        
+
         # Use Heroku Inference API if available
         if os.getenv("INFERENCE_KEY"):
-            heroku_model = "openai:claude-4-sonnet"
+            heroku_model = os.getenv("INFERENCE_MODEL_ID", "claude-4-sonnet")
+            # Use openai: prefix for Heroku Inference API compatibility
+            heroku_model_full = f"openai:{heroku_model}"
             values.update({
-                "research_model": heroku_model,
-                "summarization_model": heroku_model,
-                "compression_model": heroku_model,
-                "final_report_model": heroku_model
+                "research_model": heroku_model_full,
+                "summarization_model": heroku_model_full,
+                "compression_model": heroku_model_full,
+                "final_report_model": heroku_model_full
             })
-        
+
+            # Auto-select search API based on available credentials
+            # Only override if not explicitly set in config
+            if not configurable.get("search_api"):
+                # Check for Bright Data API key (supports both naming conventions)
+                if os.getenv("BRIGHTDATA_API_KEY") or os.getenv("BRIGHT_DATA_API_KEY"):
+                    values["search_api"] = SearchAPI.BRIGHTDATA
+                elif os.getenv("TAVILY_API_KEY"):
+                    values["search_api"] = SearchAPI.TAVILY
+                else:
+                    # No search API available - model will use its knowledge only
+                    # Anthropic/OpenAI native search requires direct API access, not compatible
+                    # with Heroku Inference API's OpenAI-compatible endpoint
+                    values["search_api"] = SearchAPI.NONE
+
         return cls(**{k: v for k, v in values.items() if v is not None})
 
     class Config:
