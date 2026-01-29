@@ -72,12 +72,6 @@ async def start():
     config = Configuration.from_runnable_config({})
     cl.user_session.set("config", config)
 
-    # Set custom avatar for assistant
-    await cl.Avatar(
-        name="Heroku Deep Research",
-        url="/public/logo.svg",
-    ).send()
-
     # Create settings panel
     settings = await cl.ChatSettings(
         [
