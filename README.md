@@ -26,9 +26,7 @@ Deploy this research agent to Heroku with Claude 4 Sonnet in seconds:
 
 After deployment, just add your Bright Data API key and your research agent will be ready to perform comprehensive web research!
 
-> **🔴 Current Status**: The deployment is 95% functional with all integrations working. There's a remaining tool calling compatibility issue being resolved. See `DEPLOYMENT_STATUS.md` for technical details.
-> 
-> **Live Demo**: https://open-deep-research-1755945095-d3e3b53f6c8f.herokuapp.com/
+> **✅ Live Demo**: https://heroku-deep-research-test-f9cc0deb2940.herokuapp.com/
 
 <img width="817" height="666" alt="Screenshot 2025-07-13 at 11 21 12 PM" src="https://github.com/user-attachments/assets/052f2ed3-c664-4a4f-8ec2-074349dcaa3f" />
 
