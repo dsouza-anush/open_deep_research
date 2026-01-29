@@ -23,4 +23,4 @@ An AI-powered research assistant that conducts thorough, multi-source research o
 
 ---
 
-*Built with [LangGraph](https://langchain-ai.github.io/langgraph/) and [Chainlit](https://chainlit.io) on [Heroku](https://heroku.com)*
+*Built with [LangGraph](https://langchain-ai.github.io/langgraph/) on [Heroku](https://heroku.com)* | [View Source](https://github.com/dsouza-anush/open_deep_research)
