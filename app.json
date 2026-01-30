@@ -31,7 +31,6 @@
     },
     "TAVILY_API_KEY": {
       "description": "Tavily API key for web search capabilities (optional but recommended for enhanced research)",
-      "value": "tvly-placeholder",
       "required": false
     },
     "LANGSMITH_API_KEY": {
