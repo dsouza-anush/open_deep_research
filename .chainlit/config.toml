@@ -1,11 +1,11 @@
 [project]
-# Allow all origins for demo
+# Allow all origins for demo/development
 allow_origins = ["*"]
 
-# Session timeout in seconds
+# Session timeout in seconds (1 hour)
 session_timeout = 3600
 
-# Enable caching
+# Enable caching for better performance
 cache = false
 
 [features]
@@ -15,9 +15,24 @@ prompt_playground = false
 # Enable multi-modal (file uploads)
 multi_modal = true
 
+# Enable user feedback on messages (thumbs up/down)
+unsafe_allow_html = false
+
+# Enable edit message feature
+edit_message = true
+
+# Enable latex rendering for mathematical content
+latex = true
+
+# Spontaneous file upload
+spontaneous_file_upload = true
+
 [UI]
 # App name shown in header
-name = "Heroku Deep Research"
+name = "Deep Research"
+
+# App description for SEO
+description = "AI-powered research assistant that conducts thorough, multi-source investigations"
 
 # Default theme
 default_theme = "dark"
@@ -25,7 +40,7 @@ default_theme = "dark"
 # Custom CSS for purple theming
 custom_css = "/public/custom.css"
 
-# Chain of thought display mode
+# Chain of thought display mode (show tool calls)
 cot = "tool_call"
 
 # Don't collapse content by default
@@ -36,6 +51,16 @@ show_readme_as_default = true
 
 # GitHub link in header
 github = "https://github.com/dsouza-anush/open_deep_research"
+
+# Hide Chainlit watermark for cleaner look
+hide_cot = false
+
+# Layout mode - wide for more content space
+layout = "default"
+
+[UI.theme]
+# Use the custom theme.json in public folder
+# Light and dark themes defined there
 
 [meta]
 generated_by = "1.0.0"

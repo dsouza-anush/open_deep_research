@@ -1,52 +1,602 @@
-/* Custom theme for Heroku Deep Research */
+/* ============================================
+   Heroku Deep Research - Custom Theme
+   A polished, professional AI research interface
+   ============================================ */
 
-/* Make the welcome logo smaller (default is too large) */
+/* ============================================
+   CSS Custom Properties
+   ============================================ */
+:root {
+  --primary: #79589f;
+  --primary-light: #9b7bc7;
+  --primary-dark: #6762a6;
+  --primary-darker: #5a4d8a;
+  --accent: #c4b5d9;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #3b82f6;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 350ms ease;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.2);
+  --shadow-glow: 0 0 20px rgba(121, 88, 159, 0.3);
+
+  /* Border radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+}
+
+/* ============================================
+   Global Enhancements
+   ============================================ */
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Better text rendering */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Focus visible styles for accessibility */
+*:focus-visible {
+  outline: 2px solid var(--primary-light) !important;
+  outline-offset: 2px !important;
+}
+
+/* ============================================
+   Custom Scrollbar Styling
+   ============================================ */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(121, 88, 159, 0.3);
+  border-radius: var(--radius-full);
+  transition: background var(--transition-fast);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(121, 88, 159, 0.5);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(121, 88, 159, 0.3) transparent;
+}
+
+/* ============================================
+   Logo & Branding
+   ============================================ */
 .watermark img,
 [class*="watermark"] img,
-.MuiBox-root > img {
-  max-width: 64px !important;
-  max-height: 64px !important;
-  width: 64px !important;
-  height: 64px !important;
+.MuiBox-root > img[alt*="logo"],
+.MuiBox-root > img[alt*="Logo"] {
+  max-width: 80px !important;
+  max-height: 80px !important;
+  width: 80px !important;
+  height: 80px !important;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+  transition: transform var(--transition-normal), filter var(--transition-normal);
 }
 
-/* Purple send button to match Heroku branding */
-button[type="submit"] {
-  background-color: #79589f !important;
-  color: white !important;
+.watermark img:hover,
+[class*="watermark"] img:hover {
+  transform: scale(1.05);
+  filter: drop-shadow(0 6px 12px rgba(121, 88, 159, 0.3));
 }
 
-button[type="submit"]:hover {
-  background-color: #6762a6 !important;
-}
-
-/* The circular send button */
+/* ============================================
+   Primary Button Styles (Send button, FAB)
+   ============================================ */
+button[type="submit"],
 .MuiFab-root,
 .MuiFab-primary,
 [class*="MuiFab"] {
-  background-color: #79589f !important;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%) !important;
   color: white !important;
+  box-shadow: var(--shadow-md), var(--shadow-glow) !important;
+  transition: all var(--transition-normal) !important;
+  border: none !important;
 }
 
+button[type="submit"]:hover,
 .MuiFab-root:hover,
 .MuiFab-primary:hover {
-  background-color: #6762a6 !important;
+  background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: var(--shadow-lg), 0 0 30px rgba(121, 88, 159, 0.4) !important;
 }
 
-/* Any primary colored buttons */
+button[type="submit"]:active,
+.MuiFab-root:active,
+.MuiFab-primary:active {
+  transform: translateY(0) scale(0.98) !important;
+}
+
+button[type="submit"]:disabled,
+.MuiFab-root:disabled {
+  background: #4b5563 !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
+}
+
+/* ============================================
+   Secondary & Contained Buttons
+   ============================================ */
 .MuiButton-containedPrimary,
 .MuiIconButton-colorPrimary {
-  background-color: #79589f !important;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%) !important;
   color: white !important;
+  transition: all var(--transition-normal) !important;
 }
 
 .MuiButton-containedPrimary:hover,
 .MuiIconButton-colorPrimary:hover {
-  background-color: #6762a6 !important;
+  background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: var(--shadow-md) !important;
 }
 
-/* Primary color accent override */
-:root {
-  --primary-color: #79589f;
-  --primary-dark: #6762a6;
+/* Outlined button variants */
+.MuiButton-outlinedPrimary {
+  border-color: var(--primary) !important;
+  color: var(--primary) !important;
+  transition: all var(--transition-normal) !important;
+}
+
+.MuiButton-outlinedPrimary:hover {
+  background: rgba(121, 88, 159, 0.1) !important;
+  border-color: var(--primary-light) !important;
+}
+
+/* ============================================
+   Chat Input Styling
+   ============================================ */
+.MuiInputBase-root,
+.MuiOutlinedInput-root,
+[class*="inputBase"],
+textarea {
+  transition: all var(--transition-normal) !important;
+}
+
+.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: var(--primary) !important;
+}
+
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: var(--primary-light) !important;
+  border-width: 2px !important;
+  box-shadow: 0 0 0 3px rgba(121, 88, 159, 0.1) !important;
+}
+
+/* ============================================
+   Message Bubbles & Cards
+   ============================================ */
+[class*="message"],
+[class*="Message"] {
+  transition: all var(--transition-fast) !important;
+}
+
+/* User message styling */
+[class*="userMessage"],
+[class*="user-message"] {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%) !important;
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg) !important;
+}
+
+/* Assistant message styling */
+[class*="assistantMessage"],
+[class*="assistant-message"],
+[class*="botMessage"] {
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-sm) !important;
+}
+
+/* ============================================
+   Step & Tool Call Cards
+   ============================================ */
+[class*="step"],
+[class*="Step"] {
+  border-radius: var(--radius-md) !important;
+  border-left: 3px solid var(--primary) !important;
+  transition: all var(--transition-normal) !important;
+  margin: 8px 0 !important;
+}
+
+[class*="step"]:hover,
+[class*="Step"]:hover {
+  border-left-color: var(--primary-light) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* Collapsible step headers */
+[class*="stepHeader"],
+[class*="StepHeader"] {
+  transition: background var(--transition-fast) !important;
+}
+
+[class*="stepHeader"]:hover,
+[class*="StepHeader"]:hover {
+  background: rgba(121, 88, 159, 0.05) !important;
+}
+
+/* ============================================
+   Starter Cards (Welcome Screen)
+   ============================================ */
+[class*="starter"],
+[class*="Starter"] {
+  border-radius: var(--radius-lg) !important;
+  border: 1px solid rgba(121, 88, 159, 0.2) !important;
+  background: rgba(121, 88, 159, 0.05) !important;
+  transition: all var(--transition-normal) !important;
+  cursor: pointer !important;
+}
+
+[class*="starter"]:hover,
+[class*="Starter"]:hover {
+  border-color: var(--primary) !important;
+  background: rgba(121, 88, 159, 0.1) !important;
+  transform: translateY(-4px) !important;
+  box-shadow: var(--shadow-lg), var(--shadow-glow) !important;
+}
+
+[class*="starter"]:active,
+[class*="Starter"]:active {
+  transform: translateY(-2px) !important;
+}
+
+/* Starter icon styling */
+[class*="starter"] img,
+[class*="Starter"] img,
+[class*="starter"] svg,
+[class*="Starter"] svg {
+  transition: transform var(--transition-normal) !important;
+}
+
+[class*="starter"]:hover img,
+[class*="Starter"]:hover img,
+[class*="starter"]:hover svg,
+[class*="Starter"]:hover svg {
+  transform: scale(1.1) !important;
+}
+
+/* ============================================
+   Settings Panel
+   ============================================ */
+[class*="settings"],
+[class*="Settings"] {
+  border-radius: var(--radius-lg) !important;
+}
+
+/* Slider styling */
+.MuiSlider-root {
+  color: var(--primary) !important;
+}
+
+.MuiSlider-thumb {
+  box-shadow: var(--shadow-sm) !important;
+  transition: box-shadow var(--transition-fast) !important;
+}
+
+.MuiSlider-thumb:hover,
+.MuiSlider-thumb.Mui-focusVisible {
+  box-shadow: 0 0 0 8px rgba(121, 88, 159, 0.16) !important;
+}
+
+.MuiSlider-track {
+  background: linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%) !important;
+}
+
+/* Switch styling */
+.MuiSwitch-switchBase.Mui-checked {
+  color: var(--primary) !important;
+}
+
+.MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track {
+  background-color: var(--primary) !important;
+}
+
+/* Select dropdown styling */
+.MuiSelect-select {
+  transition: all var(--transition-fast) !important;
+}
+
+.MuiMenuItem-root:hover {
+  background: rgba(121, 88, 159, 0.1) !important;
+}
+
+.MuiMenuItem-root.Mui-selected {
+  background: rgba(121, 88, 159, 0.2) !important;
+}
+
+/* ============================================
+   Action Buttons
+   ============================================ */
+[class*="action"],
+[class*="Action"] {
+  border-radius: var(--radius-md) !important;
+  transition: all var(--transition-normal) !important;
+  border: 1px solid rgba(121, 88, 159, 0.3) !important;
+}
+
+[class*="action"]:hover,
+[class*="Action"]:hover {
+  background: rgba(121, 88, 159, 0.15) !important;
+  border-color: var(--primary) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* ============================================
+   Side Panel & Document Elements
+   ============================================ */
+[class*="sidePanel"],
+[class*="SidePanel"],
+[class*="side-panel"] {
+  border-left: 1px solid rgba(121, 88, 159, 0.2) !important;
+  background: rgba(15, 15, 26, 0.98) !important;
+}
+
+[class*="element"],
+[class*="Element"] {
+  border-radius: var(--radius-md) !important;
+  transition: all var(--transition-fast) !important;
+}
+
+/* ============================================
+   Code Blocks
+   ============================================ */
+pre, code {
+  border-radius: var(--radius-md) !important;
+}
+
+pre {
+  border: 1px solid rgba(121, 88, 159, 0.2) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* Syntax highlighting accent */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-title,
+.hljs-section,
+.hljs-doctag,
+.hljs-name,
+.hljs-strong {
+  color: var(--primary-light) !important;
+}
+
+/* ============================================
+   Loading & Progress Indicators
+   ============================================ */
+[class*="loading"],
+[class*="Loading"],
+[class*="progress"],
+[class*="Progress"] {
+  color: var(--primary) !important;
+}
+
+.MuiCircularProgress-root {
+  color: var(--primary) !important;
+}
+
+.MuiLinearProgress-root {
+  background: rgba(121, 88, 159, 0.2) !important;
+}
+
+.MuiLinearProgress-bar {
+  background: linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%) !important;
+}
+
+/* Pulse animation for loading states */
+@keyframes pulse-purple {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+[class*="loading"],
+[class*="Loading"] {
+  animation: pulse-purple 2s ease-in-out infinite;
+}
+
+/* ============================================
+   Tooltips & Popovers
+   ============================================ */
+.MuiTooltip-tooltip {
+  background: var(--primary-darker) !important;
+  border-radius: var(--radius-sm) !important;
+  font-size: 12px !important;
+  padding: 6px 12px !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+.MuiTooltip-arrow {
+  color: var(--primary-darker) !important;
+}
+
+/* ============================================
+   Feedback Buttons (Like/Dislike)
+   ============================================ */
+[class*="feedback"],
+[class*="Feedback"] {
+  transition: all var(--transition-fast) !important;
+}
+
+[class*="feedback"]:hover,
+[class*="Feedback"]:hover {
+  color: var(--primary) !important;
+  transform: scale(1.1) !important;
+}
+
+/* ============================================
+   Avatar Styling
+   ============================================ */
+[class*="avatar"],
+[class*="Avatar"] {
+  border-radius: var(--radius-full) !important;
+  box-shadow: var(--shadow-sm) !important;
+  transition: all var(--transition-fast) !important;
+}
+
+[class*="avatar"]:hover,
+[class*="Avatar"]:hover {
+  box-shadow: var(--shadow-md), var(--shadow-glow) !important;
+}
+
+/* ============================================
+   Chat Profiles
+   ============================================ */
+[class*="chatProfile"],
+[class*="ChatProfile"],
+[class*="profile-selector"] {
+  border-radius: var(--radius-lg) !important;
+  border: 1px solid rgba(121, 88, 159, 0.2) !important;
+  transition: all var(--transition-normal) !important;
+}
+
+[class*="chatProfile"]:hover,
+[class*="ChatProfile"]:hover {
+  border-color: var(--primary) !important;
+  background: rgba(121, 88, 159, 0.1) !important;
+}
+
+/* ============================================
+   Header & Navigation
+   ============================================ */
+header,
+[class*="header"],
+[class*="Header"] {
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+
+/* GitHub link styling */
+a[href*="github"] {
+  transition: all var(--transition-fast) !important;
+}
+
+a[href*="github"]:hover {
+  color: var(--primary-light) !important;
+  transform: scale(1.05) !important;
+}
+
+/* ============================================
+   Markdown Content Styling
+   ============================================ */
+[class*="markdown"] h1,
+[class*="markdown"] h2,
+[class*="markdown"] h3 {
+  color: var(--primary-light) !important;
+  border-bottom-color: rgba(121, 88, 159, 0.2) !important;
+}
+
+[class*="markdown"] a {
+  color: var(--primary-light) !important;
+  text-decoration: none !important;
+  border-bottom: 1px solid transparent !important;
+  transition: all var(--transition-fast) !important;
+}
+
+[class*="markdown"] a:hover {
+  color: var(--accent) !important;
+  border-bottom-color: var(--accent) !important;
+}
+
+[class*="markdown"] blockquote {
+  border-left-color: var(--primary) !important;
+  background: rgba(121, 88, 159, 0.05) !important;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0 !important;
+}
+
+[class*="markdown"] table th {
+  background: rgba(121, 88, 159, 0.15) !important;
+}
+
+[class*="markdown"] table tr:hover {
+  background: rgba(121, 88, 159, 0.05) !important;
+}
+
+[class*="markdown"] hr {
+  border-color: rgba(121, 88, 159, 0.2) !important;
+}
+
+/* ============================================
+   Responsive Adjustments
+   ============================================ */
+@media (max-width: 768px) {
+  .watermark img,
+  [class*="watermark"] img {
+    max-width: 60px !important;
+    max-height: 60px !important;
+    width: 60px !important;
+    height: 60px !important;
+  }
+
+  [class*="starter"],
+  [class*="Starter"] {
+    padding: 12px !important;
+  }
+
+  [class*="starter"]:hover,
+  [class*="Starter"]:hover {
+    transform: translateY(-2px) !important;
+  }
+}
+
+/* ============================================
+   Print Styles
+   ============================================ */
+@media print {
+  [class*="sidebar"],
+  [class*="Sidebar"],
+  [class*="header"],
+  [class*="Header"],
+  button,
+  [class*="action"],
+  [class*="Action"] {
+    display: none !important;
+  }
+
+  [class*="message"],
+  [class*="Message"] {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
+
+/* ============================================
+   Reduced Motion Preferences
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

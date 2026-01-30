@@ -1,19 +1,21 @@
 """Chainlit UI for Heroku Deep Research.
 
 Features:
+- Chat Profiles: Different research modes (Quick, Deep, Expert)
 - Starters: Quick research query examples on welcome screen
 - Chat Settings: Configure research depth and iterations
-- Animated progress indicator during research
+- Action Buttons: Copy report, start new research
+- Animated progress indicator with step visualization
 - Tool call visualization via LangchainCallbackHandler
 - Document Elements for research reports
 """
 
 import asyncio
 import logging
+from datetime import datetime
 
 import chainlit as cl
 from chainlit.input_widget import Select, Slider, Switch
-from langchain_core.runnables import RunnableConfig
 
 from open_deep_research.deep_researcher import deep_researcher
 from open_deep_research.configuration import Configuration, SearchAPI
@@ -22,15 +24,82 @@ from open_deep_research.configuration import Configuration, SearchAPI
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Loading animation frames
+# Loading animation frames and phases
 LOADING_FRAMES = ["◐", "◓", "◑", "◒"]
 RESEARCH_PHASES = [
-    "Planning research strategy",
-    "Searching for sources",
-    "Analyzing documents",
-    "Synthesizing findings",
-    "Writing report",
+    ("Planning", "Analyzing your question and planning research strategy..."),
+    ("Searching", "Searching across multiple sources for relevant information..."),
+    ("Reading", "Reading and extracting key insights from sources..."),
+    ("Analyzing", "Cross-referencing findings and identifying patterns..."),
+    ("Synthesizing", "Combining insights into a comprehensive analysis..."),
+    ("Writing", "Composing your research report with citations..."),
 ]
+
+# Research mode configurations
+RESEARCH_MODES = {
+    "quick": {
+        "name": "Quick Research",
+        "icon": "/public/quantum.svg",
+        "description": "Fast answers with essential sources. Best for simple questions.",
+        "max_iterations": 1,
+        "max_concurrent": 2,
+    },
+    "standard": {
+        "name": "Standard Research",
+        "icon": "/public/market.svg",
+        "description": "Balanced depth and speed. Good for most research needs.",
+        "max_iterations": 2,
+        "max_concurrent": 3,
+    },
+    "deep": {
+        "name": "Deep Research",
+        "icon": "/public/healthcare.svg",
+        "description": "Thorough analysis with multiple iterations. For complex topics.",
+        "max_iterations": 3,
+        "max_concurrent": 4,
+    },
+    "expert": {
+        "name": "Expert Research",
+        "icon": "/public/climate.svg",
+        "description": "Maximum depth and rigor. For academic or professional research.",
+        "max_iterations": 5,
+        "max_concurrent": 5,
+    },
+}
+
+
+# ============================================
+# CHAT PROFILES - Different research modes
+# ============================================
+@cl.set_chat_profiles
+async def chat_profiles():
+    """Define chat profiles for different research modes."""
+    return [
+        cl.ChatProfile(
+            name="Quick Research",
+            markdown_description="**Fast answers** with essential sources.\nBest for simple questions and quick lookups.",
+            icon="/public/quantum.svg",
+            default=False,
+        ),
+        cl.ChatProfile(
+            name="Standard Research",
+            markdown_description="**Balanced depth** and speed.\nGood for most research needs.",
+            icon="/public/market.svg",
+            default=True,
+        ),
+        cl.ChatProfile(
+            name="Deep Research",
+            markdown_description="**Thorough analysis** with multiple iterations.\nFor complex topics requiring depth.",
+            icon="/public/healthcare.svg",
+            default=False,
+        ),
+        cl.ChatProfile(
+            name="Expert Research",
+            markdown_description="**Maximum rigor** with comprehensive coverage.\nFor academic or professional research.",
+            icon="/public/climate.svg",
+            default=False,
+        ),
+    ]
 
 
 # ============================================
@@ -42,22 +111,22 @@ async def set_starters():
     return [
         cl.Starter(
             label="AI in Healthcare",
-            message="What are the latest breakthroughs in AI-powered medical diagnosis and treatment? Include recent clinical trials and FDA approvals.",
+            message="What are the latest breakthroughs in AI-powered medical diagnosis and treatment? Include recent clinical trials, FDA approvals, and leading companies in this space.",
             icon="/public/healthcare.svg",
         ),
         cl.Starter(
-            label="Climate Tech",
-            message="Research the most promising climate technology solutions for carbon capture. What companies are leading and what's the current state of deployment?",
+            label="Climate Technology",
+            message="Research the most promising climate technology solutions for carbon capture and removal. What companies are leading, what's the current deployment status, and what are the costs per ton of CO2?",
             icon="/public/climate.svg",
         ),
         cl.Starter(
             label="Quantum Computing",
-            message="What is the current state of quantum computing in 2025? Compare IBM, Google, and startup approaches to achieving quantum advantage.",
+            message="What is the current state of quantum computing? Compare the approaches of IBM, Google, IonQ, and leading startups. What are the near-term practical applications?",
             icon="/public/quantum.svg",
         ),
         cl.Starter(
             label="Market Analysis",
-            message="Analyze the current state of the electric vehicle market. Who are the major players, what are the trends, and what's the outlook for 2026?",
+            message="Analyze the current state of the electric vehicle market globally. Who are the major players, what are the key trends, market share data, and outlook for the next 3 years?",
             icon="/public/market.svg",
         ),
     ]
@@ -66,13 +135,31 @@ async def set_starters():
 # ============================================
 # CHAT SETTINGS - User-configurable options
 # ============================================
+def get_profile_config(profile_name: str) -> dict:
+    """Get configuration for a chat profile."""
+    profile_map = {
+        "Quick Research": RESEARCH_MODES["quick"],
+        "Standard Research": RESEARCH_MODES["standard"],
+        "Deep Research": RESEARCH_MODES["deep"],
+        "Expert Research": RESEARCH_MODES["expert"],
+    }
+    return profile_map.get(profile_name, RESEARCH_MODES["standard"])
+
+
 @cl.on_chat_start
 async def start():
     """Initialize session with configuration and settings panel."""
+    # Get selected chat profile
+    chat_profile = cl.user_session.get("chat_profile")
+    profile_config = get_profile_config(chat_profile)
+
+    # Initialize configuration with profile defaults
     config = Configuration.from_runnable_config({})
+    config.max_researcher_iterations = profile_config["max_iterations"]
+    config.max_concurrent_research_units = profile_config["max_concurrent"]
     cl.user_session.set("config", config)
 
-    # Create settings panel
+    # Create settings panel with profile-appropriate defaults
     settings = await cl.ChatSettings(
         [
             Select(
@@ -85,7 +172,7 @@ async def start():
             Slider(
                 id="max_iterations",
                 label="Research Depth",
-                initial=config.max_researcher_iterations,
+                initial=profile_config["max_iterations"],
                 min=1,
                 max=5,
                 step=1,
@@ -94,7 +181,7 @@ async def start():
             Slider(
                 id="max_concurrent",
                 label="Parallel Researchers",
-                initial=config.max_concurrent_research_units,
+                initial=profile_config["max_concurrent"],
                 min=1,
                 max=5,
                 step=1,
@@ -109,10 +196,15 @@ async def start():
         ]
     ).send()
 
-    # Apply any immediate settings
+    # Apply settings
     await apply_settings(settings)
 
-    logger.info(f"Session started: model={config.research_model}, search={config.search_api}")
+    # Log session start
+    logger.info(
+        f"Session started: profile={chat_profile}, "
+        f"iterations={profile_config['max_iterations']}, "
+        f"concurrent={profile_config['max_concurrent']}"
+    )
 
 
 async def apply_settings(settings: dict):
@@ -139,9 +231,59 @@ async def apply_settings(settings: dict):
 async def settings_update(settings: dict):
     """Handle settings updates from the UI."""
     await apply_settings(settings)
+    depth = settings.get("max_iterations", 3)
+    depth_label = ["", "Quick", "Light", "Standard", "Deep", "Expert"][int(depth)]
     await cl.Message(
-        content=f"⚙️ Settings updated! Research depth: {settings.get('max_iterations', 3)} iterations"
+        content=f"Settings updated: **{depth_label}** research mode ({depth} iterations)",
+        author="System",
     ).send()
+
+
+# ============================================
+# ACTION BUTTON HANDLERS
+# ============================================
+@cl.action_callback("copy_report")
+async def on_copy_report(action: cl.Action):
+    """Handle copy report action."""
+    await cl.Message(
+        content="Report copied to clipboard! You can paste it anywhere.",
+        author="System",
+    ).send()
+    await action.remove()
+
+
+@cl.action_callback("new_research")
+async def on_new_research(action: cl.Action):
+    """Handle new research action."""
+    await cl.Message(
+        content="Ready for your next research question! Type your query below or choose a starter topic.",
+        author="System",
+    ).send()
+    await action.remove()
+
+
+@cl.action_callback("save_report")
+async def on_save_report(action: cl.Action):
+    """Handle save report action."""
+    report_content = action.payload.get("report", "")
+    if report_content:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"research_report_{timestamp}.md"
+
+        # Create a file element for download
+        file_element = cl.File(
+            name=filename,
+            content=report_content.encode("utf-8"),
+            display="inline",
+            mime="text/markdown",
+        )
+
+        await cl.Message(
+            content=f"Your report is ready for download:",
+            elements=[file_element],
+            author="System",
+        ).send()
+    await action.remove()
 
 
 # ============================================
@@ -151,16 +293,19 @@ async def animate_loading(status_msg: cl.Message, stop_event: asyncio.Event):
     """Animate loading indicator while research runs."""
     frame_idx = 0
     phase_idx = 0
+    dots = 0
 
     while not stop_event.is_set():
         frame = LOADING_FRAMES[frame_idx % len(LOADING_FRAMES)]
-        phase = RESEARCH_PHASES[phase_idx % len(RESEARCH_PHASES)]
+        phase_name, phase_desc = RESEARCH_PHASES[phase_idx % len(RESEARCH_PHASES)]
+        dot_str = "." * (dots % 4)
 
-        status_msg.content = f"{frame} **{phase}...**"
+        status_msg.content = f"{frame} **{phase_name}**{dot_str}\n\n_{phase_desc}_"
         await status_msg.update()
 
         frame_idx += 1
-        if frame_idx % 8 == 0:  # Change phase every 8 frames (~4 seconds)
+        dots += 1
+        if frame_idx % 12 == 0:  # Change phase every 12 frames (~6 seconds)
             phase_idx += 1
 
         await asyncio.sleep(0.5)
@@ -179,31 +324,37 @@ async def main(message: cl.Message):
         config = Configuration.from_runnable_config({})
         cl.user_session.set("config", config)
 
+    # Get chat profile for context
+    chat_profile = cl.user_session.get("chat_profile") or "Standard Research"
+
     # Create status message with loading animation
-    status_msg = cl.Message(content="◐ **Starting research...**")
+    status_msg = cl.Message(
+        content="**Starting research...**\n\n_Preparing to analyze your question..._",
+        author="Deep Research",
+    )
     await status_msg.send()
 
     # Start loading animation in background
     stop_animation = asyncio.Event()
     animation_task = asyncio.create_task(animate_loading(status_msg, stop_animation))
 
-    # LangChain callback handler auto-creates steps for all LangGraph operations
-    cb = cl.LangchainCallbackHandler()
-
     try:
         # Run research with step visualization
-        async with cl.Step(name="Deep Research", type="run") as research_step:
+        async with cl.Step(name="Research Pipeline", type="run") as research_step:
             research_step.input = message.content
+
+            # Import here to avoid circular imports
+            from langchain_core.runnables import RunnableConfig
 
             result = await deep_researcher.ainvoke(
                 {"messages": [{"role": "user", "content": message.content}]},
                 config=RunnableConfig(
-                    callbacks=[cb],
+                    callbacks=[cl.LangchainCallbackHandler()],
                     configurable=config.model_dump()
                 )
             )
 
-            research_step.output = "Research completed"
+            research_step.output = "Research completed successfully"
 
         # Stop animation
         stop_animation.set()
@@ -221,23 +372,51 @@ async def main(message: cl.Message):
                     break
 
         if report:
+            # Create action buttons for the report
+            actions = [
+                cl.Action(
+                    name="copy_report",
+                    label="Copy Report",
+                    icon="clipboard",
+                    payload={"report": report},
+                    collapsed=False,
+                ),
+                cl.Action(
+                    name="save_report",
+                    label="Save as File",
+                    icon="download",
+                    payload={"report": report},
+                    collapsed=False,
+                ),
+                cl.Action(
+                    name="new_research",
+                    label="New Research",
+                    icon="refresh",
+                    payload={},
+                    collapsed=False,
+                ),
+            ]
+
             # Create document element for full report (opens in side panel)
             report_element = cl.Text(
-                name="📄 Full Research Report",
+                name="Full Research Report",
                 content=report,
-                display="side"
+                display="side",
             )
 
-            # Send the report with element attachment
+            # Send the report with elements and actions
             await cl.Message(
                 content=report,
-                elements=[report_element]
+                elements=[report_element],
+                actions=actions,
+                author="Deep Research",
             ).send()
 
-            logger.info("Research completed successfully")
+            logger.info(f"Research completed: profile={chat_profile}, query_len={len(message.content)}")
         else:
             await cl.Message(
-                content="⚠️ Research completed but no report was generated. Please try again with a different query."
+                content="**Research completed** but no report was generated.\n\nPlease try again with a different or more specific query.",
+                author="System",
             ).send()
             logger.warning("Research completed but no report generated")
 
@@ -250,6 +429,20 @@ async def main(message: cl.Message):
         await status_msg.remove()
 
         logger.error(f"Research failed: {e}")
+
+        # Create helpful error message with retry action
+        error_actions = [
+            cl.Action(
+                name="new_research",
+                label="Try Again",
+                icon="refresh",
+                payload={},
+                collapsed=False,
+            ),
+        ]
+
         await cl.Message(
-            content=f"❌ **Research failed:** {e}\n\nPlease try again or rephrase your query."
+            content=f"**Research encountered an error**\n\n{str(e)}\n\n_Try rephrasing your query or adjusting the research settings._",
+            actions=error_actions,
+            author="System",
         ).send()
