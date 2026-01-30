@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import os
+import re
 import warnings
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any, Dict, List, Literal, Optional
@@ -45,7 +46,7 @@ try:
     BRIGHTDATA_AVAILABLE = True
 except ImportError:
     BRIGHTDATA_AVAILABLE = False
-    logging.warning("langchain_brightdata not installed. Bright Data search will be unavailable.")
+    logger.warning("langchain_brightdata not installed. Bright Data search will be unavailable.")
 
 BRIGHT_DATA_SEARCH_DESCRIPTION = (
     "Search the web and scrape current information using Bright Data's enterprise proxy network. "
@@ -240,9 +241,6 @@ async def brightdata_single_search(
         results = []
         if scrape_result:
             # Extract search result data from the scraped HTML
-            # This is a basic implementation - you might want to use BeautifulSoup for better parsing
-            import re
-            
             # Try to extract search result patterns
             title_pattern = r'<h3[^>]*>([^<]+)</h3>'
             url_pattern = r'<a[^>]*href="([^"]+)"[^>]*>'
@@ -266,7 +264,7 @@ async def brightdata_single_search(
         return {"query": query, "results": results}
         
     except Exception as e:
-        logging.error(f"Error in Bright Data search: {str(e)}")
+        logger.error(f"Error in Bright Data search: {str(e)}")
         return {"query": query, "results": []}
 
 
@@ -442,11 +440,11 @@ async def summarize_webpage(model: BaseChatModel, webpage_content: str) -> str:
         
     except asyncio.TimeoutError:
         # Timeout during summarization - return original content
-        logging.warning("Summarization timed out after 60 seconds, returning original content")
+        logger.warning("Summarization timed out after 60 seconds, returning original content")
         return webpage_content
     except Exception as e:
         # Other errors during summarization - log and return original content
-        logging.warning(f"Summarization failed with error: {str(e)}, returning original content")
+        logger.warning(f"Summarization failed with error: {str(e)}, returning original content")
         return webpage_content
 
 ##########################
@@ -520,10 +518,10 @@ async def get_mcp_access_token(
                 else:
                     # Log error details for debugging
                     response_text = await response.text()
-                    logging.error(f"Token exchange failed: {response_text}")
-                    
+                    logger.error(f"Token exchange failed: {response_text}")
+
     except Exception as e:
-        logging.error(f"Error during token exchange: {e}")
+        logger.error(f"Error during token exchange: {e}")
     
     return None
 

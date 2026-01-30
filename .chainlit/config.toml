@@ -46,8 +46,8 @@ cot = "tool_call"
 # Don't collapse content by default
 default_collapse_content = false
 
-# Show welcome message (chainlit.md) on start
-show_readme_as_default = true
+# Don't show welcome message popup
+show_readme_as_default = false
 
 # GitHub link in header
 github = "https://github.com/dsouza-anush/open_deep_research"

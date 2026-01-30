@@ -16,6 +16,7 @@ from datetime import datetime
 
 import chainlit as cl
 from chainlit.input_widget import Select, Slider, Switch
+from langchain_core.runnables import RunnableConfig
 
 from open_deep_research.deep_researcher import deep_researcher
 from open_deep_research.configuration import Configuration, SearchAPI
@@ -207,7 +208,7 @@ async def start():
     )
 
 
-async def apply_settings(settings: dict):
+async def apply_settings(settings: dict) -> None:
     """Apply settings to the current configuration."""
     config = cl.user_session.get("config")
     if not config:
@@ -227,12 +228,16 @@ async def apply_settings(settings: dict):
     logger.info(f"Settings applied: {settings}")
 
 
+# Depth labels mapped to iteration counts
+DEPTH_LABELS = {1: "Quick", 2: "Light", 3: "Standard", 4: "Deep", 5: "Expert"}
+
+
 @cl.on_settings_update
-async def settings_update(settings: dict):
+async def settings_update(settings: dict) -> None:
     """Handle settings updates from the UI."""
     await apply_settings(settings)
-    depth = settings.get("max_iterations", 3)
-    depth_label = ["", "Quick", "Light", "Standard", "Deep", "Expert"][int(depth)]
+    depth = int(settings.get("max_iterations", 3))
+    depth_label = DEPTH_LABELS.get(depth, "Custom")
     await cl.Message(
         content=f"Settings updated: **{depth_label}** research mode ({depth} iterations)",
         author="System",
@@ -342,9 +347,6 @@ async def main(message: cl.Message):
         # Run research with step visualization
         async with cl.Step(name="Research Pipeline", type="run") as research_step:
             research_step.input = message.content
-
-            # Import here to avoid circular imports
-            from langchain_core.runnables import RunnableConfig
 
             result = await deep_researcher.ainvoke(
                 {"messages": [{"role": "user", "content": message.content}]},

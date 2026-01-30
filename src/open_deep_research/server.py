@@ -8,6 +8,7 @@ import asyncio
 import logging
 import os
 import time
+import traceback
 import uuid
 from typing import Dict, Optional
 
@@ -93,8 +94,6 @@ def run_research_background_sync(job_id: str, query: str, config_dict: Dict):
 
 async def run_research_background_async(job_id: str, query: str, config_dict: Dict):
     """Run research in background and update job status."""
-    import traceback
-
     try:
         if job_id not in jobs_storage:
             logger.error(f"Job {job_id} not found in storage")
@@ -153,8 +152,6 @@ async def health():
 @app.post("/research", response_model=ResearchResponse)
 async def conduct_research(request: ResearchRequest):
     """Conduct deep research and generate a report (synchronous endpoint)."""
-    import traceback
-
     try:
         config_dict = request.config or {}
 

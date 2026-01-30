@@ -2,12 +2,12 @@
 
 import asyncio
 import logging
+import re
+import traceback
+from datetime import datetime
 from typing import Literal
 
 from langchain.chat_models import init_chat_model
-
-# Configure logging
-logger = logging.getLogger(__name__)
 from langchain_core.messages import (
     AIMessage,
     HumanMessage,
@@ -55,6 +55,9 @@ from open_deep_research.utils import (
     remove_up_to_last_ai_message,
     think_tool,
 )
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 def ensure_message_content_validity(messages):
@@ -147,8 +150,6 @@ def is_heroku_inference_api(model_name: str) -> bool:
 
 async def parse_clarification_response(response_content: str) -> dict:
     """Parse clarification response from plain text when structured output isn't available."""
-    import re
-    
     # Ensure we have content to work with
     if not response_content or not response_content.strip():
         return {
@@ -822,8 +823,6 @@ researcher_subgraph = researcher_builder.compile()
 
 def generate_fallback_report(research_brief: str, findings: str) -> str:
     """Generate a fallback report when AI report generation fails."""
-    from datetime import datetime
-    
     current_date = datetime.now().strftime("%B %d, %Y")
     
     # Create a structured report from the available findings
@@ -865,21 +864,19 @@ Status: Research data collected successfully, AI synthesis unavailable
 
 async def generate_streaming_report(findings: str, research_brief: str, messages: str, config: RunnableConfig) -> str:
     """Generate report using streaming to avoid API timeouts.
-    
+
     Uses streaming responses which are specifically recommended by Heroku Inference API
     for long-running requests to avoid 408 timeout errors.
-    
+
     Args:
         findings: Research findings to synthesize
         research_brief: Original research query
         messages: User message context
         config: Runtime configuration
-        
+
     Returns:
         Complete synthesized report as string
     """
-    from datetime import datetime
-    
     configurable = Configuration.from_runnable_config(config)
     
     # Check if we're using Heroku Inference API (supports streaming)
@@ -953,21 +950,19 @@ Format the report in markdown with clear headings. Focus on actionable insights 
 
 async def generate_progressive_report(findings: str, research_brief: str, messages: str, config: RunnableConfig) -> str:
     """Generate report progressively in sections to avoid API timeouts.
-    
+
     This approach breaks down report generation into smaller, manageable sections
     that are less likely to hit API timeout limits.
-    
+
     Args:
         findings: Research findings to synthesize
         research_brief: Original research query
         messages: User message context
         config: Runtime configuration
-        
+
     Returns:
         Complete synthesized report as string
     """
-    from datetime import datetime
-    
     configurable = Configuration.from_runnable_config(config)
     model_config = {
         "model": configurable.final_report_model,
@@ -1187,7 +1182,6 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
             
         except Exception as e:
             logger.error(f" Final report generation failed: {type(e).__name__}: {str(e)}")
-            import traceback
             logger.error(f" Full traceback:\n{traceback.format_exc()}")
             
             # Handle API timeout errors specifically
